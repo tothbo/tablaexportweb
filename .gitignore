@@ -1,0 +1,5 @@
+
+*.pyc
+localconfig.json
+dl.xlsx
+*.ics
