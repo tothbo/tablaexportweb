@@ -35,6 +35,13 @@ class KartyAdatok():
             if i[-1] == int(id):
                 return i
         return []
+    def felsorolo(self) -> str:
+        a = []
+        for x in self.data:
+            if(x[0] == 'ismeretlen' or x[0] == '' or x[0] == ' ' or x[2] == 'ismeretlen' or x[2] == '' or x[2] == ' '):
+                continue
+            a.append(str(x[-1]))
+        return ";".join(a)
     def recalculate(self) -> None:
         WB = openpyxl.load_workbook("dl.xlsx", True)
         self.data = []
@@ -78,6 +85,18 @@ class KartyAdatok():
 def calcMax(databs) -> KartyAdatok:
     outdb = KartyAdatok()
     outdb.data = databs.data[slice(100)]
+    return outdb
+
+def calcFilterID(databs, hasznosDatumok, filterRowId='null'):
+    outdb = KartyAdatok()
+    if(filterRowId == 'null'):
+        raise Exception("Filter ID sor null értéket adott, ami nem lehetséges.")
+    elif(filterRowId == '' or filterRowId == ' ' or filterRowId == ';'):
+        return outdb
+    for rid in filterRowId.split(";"):
+        if(rid == '' or rid == ' '):
+            continue
+        outdb.addRow(databs.data[int(rid)])
     return outdb
 
 def calcFilter(databs, hasznosDatumok, filterDateId='null', filterTargykod='null', filterTargynev='null', filterKurz='null') -> KartyAdatok:
@@ -293,13 +312,88 @@ def index(name="Index", usname=""):
             search_kurzuskod = request.form['sz4']
             if(search_kurzuskod == '' or search_kurzuskod == ' '):
                 search_kurzuskod = 'null'
+            if(search_targynev == 'null' and search_targykod == 'null' and search_date == 'null' and search_kurzuskod == 'null'):
+                try:
+                    validk = request.form['validk']
+                except Exception as e:
+                    print("Tried to get the validk, but it threw an Exception: "+str(e))
+                    raise SystemExit
+                try:
+                    selectdb = calcFilterID(db,interHasznDatumok, validk)
+                except Exception as e:
+                    print("Error in selectdb, e:"+str(e))
+                return render_template(
+                    'index.html',
+                    name=name,
+                    usname=session["username"],
+                    hasznosDatumok=interHasznDatumok,
+                    hasznosNapok=interHasznNapok,
+                    hasznosDatHossz=len(interHasznDatumok),
+                    kartyadatok=selectdb.data, 
+                    kartyahossz=selectdb.getLength(),
+                    filterdate=nullint(search_date),
+                    filterkod=nullstr(search_targykod),
+                    filternev=nullstr(search_targynev),
+                    filterkurz=nullstr(search_kurzuskod),
+                    lasthit=lastHit(),
+                    startpg=True,
+                    elerhetoKartyaIdk = selectdb.felsorolo()
+                )
             filterdb = calcFilter(db.data, interHasznDatumok, search_date, search_targykod, search_targynev, search_kurzuskod)
-            return render_template('index.html', name=name, usname=session["username"], hasznosDatumok=interHasznDatumok, hasznosNapok=interHasznNapok, hasznosDatHossz=len(interHasznDatumok), kartyadatok=filterdb.data, kartyahossz=filterdb.getLength(), filterdate=nullint(search_date), filterkod=nullstr(search_targykod), filternev=nullstr(search_targynev), filterkurz=nullstr(search_kurzuskod), lasthit=lastHit())
+            return render_template(
+                'index.html',
+                name=name,
+                usname=session["username"],
+                hasznosDatumok=interHasznDatumok,
+                hasznosNapok=interHasznNapok,
+                hasznosDatHossz=len(interHasznDatumok),
+                kartyadatok=filterdb.data, 
+                kartyahossz=filterdb.getLength(),
+                filterdate=nullint(search_date),
+                filterkod=nullstr(search_targykod),
+                filternev=nullstr(search_targynev),
+                filterkurz=nullstr(search_kurzuskod),
+                lasthit=lastHit(),
+                startpg=False,
+                elerhetoKartyaIdk = filterdb.felsorolo()
+            )
         except Exception as e:
             print("Tried to filter at sz4, but "+str(e))
     if "username" in session:
-        return render_template('index.html', name=name, usname=session["username"], hasznosDatumok=interHasznDatumok, hasznosNapok=interHasznNapok, hasznosDatHossz=len(interHasznDatumok), kartyadatok=calcMax(db).data, kartyahossz=db.getLength(), filterdate=nullint(""), filterkod=nullstr(""), filternev=nullstr(""), filterkurz=nullstr(""), lasthit=lastHit())
-    return render_template('index.html', name=name, usname=usname, hasznosDatumok=interHasznDatumok, hasznosNapok=interHasznNapok, hasznosDatHossz=len(interHasznDatumok), kartyadatok=calcMax(db).data, kartyahossz=db.getLength(), filterdate=nullint(""), filterkod=nullstr(""), filternev=nullstr(""), filterkurz=nullstr(""), lasthit=lastHit())
+        return render_template(
+            'index.html',
+            name=name,
+            usname=session["username"],
+            hasznosDatumok=interHasznDatumok,
+            hasznosNapok=interHasznNapok,
+            hasznosDatHossz=len(interHasznDatumok),
+            kartyadatok=calcMax(db).data,
+            kartyahossz=0,
+            filterdate=nullint(""),
+            filterkod=nullstr(""),
+            filternev=nullstr(""),
+            filterkurz=nullstr(""),
+            lasthit=lastHit(),
+            startpg = True,
+            elerhetoKartyaIdk = 'null'
+        )
+    return render_template(
+        'index.html',
+        name=name,
+        usname=usname,
+        hasznosDatumok=interHasznDatumok,
+        hasznosNapok=interHasznNapok,
+        hasznosDatHossz=len(interHasznDatumok),
+        kartyadatok=calcMax(db).data,
+        kartyahossz=0,
+        filterdate=nullint(""),
+        filterkod=nullstr(""),
+        filternev=nullstr(""),
+        filterkurz=nullstr(""),
+        lasthit=lastHit(),
+        startpg = True,
+        elerhetoKartyaIdk = 'null'
+    )
 
 ## fájlok
 

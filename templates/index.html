@@ -37,7 +37,7 @@
                     </div>
                 {% else %}
                     <h1 class="text-left" style="size:1rem;" id="banner">Naptárnézet: {{ usname }}</h1>
-                    <div class="col-md-2" id="szurokSlide">
+                    <div class="col-md-3" id="szurokSlide">
                         <h2 class="text-center" style="size:0.7rem;">Szűrés:</h2>
                         <form method="POST" action="">
                             <label for="sz1" class="form-label">Dátum:</label>
@@ -54,36 +54,74 @@
                             <br/>
                             <label for="sz2" class="form-label">Tárgykód:</label>
                             <input type="text" class="form-control form-control-lg" name="sz2" aria-label=".form-control-lg sz2" placeholder="IP-18a...." value="{{ filterkod }}" />
-                            <small id="sz2" class="form-text text-muted">Nem case-sensitive (mindegy hogy nagy vagy kis betük vannak benne)</small>
+                            <small id="sz2" class="form-text text-muted">Nem case-sensitive (mindegy hogy nagy vagy kis betűk vannak benne)</small>
                             <br/><br/>
                             <label for="sz3" class="form-label">Tárgynév:</label>
                             <input type="text" class="form-control form-control-lg" name="sz3" aria-label=".form-control-lg sz3" placeholder="Atomcsill...." value="{{ filternev }}" />
-                            <small id="sz3" class="form-text text-muted">Ez sem case-sensitive.</small>
+                            <small id="sz3" class="form-text text-muted">Ez sem case-sensitive</small>
                             <br/><br/>
                             <label for="sz4" class="form-label">Kurzuskód:</label>
                             <input type="text" class="form-control form-control-lg" name="sz4" aria-label=".form-control-lg sz4" placeholder="GTKABC...." value="{{ filterkurz }}" />
-                            <small id="sz4" class="form-text text-muted">Ez sem case-sensitive ;).</small>
+                            <small id="sz4" class="form-text text-muted">Egyik sem case sensitive :D</small>
                             <br/><br/>
                             <input type="hidden" name="username" value="{{ usname }}" />
-                            <input type="submit" class="btn btn-outline-primary" value="Alkalmaz" />
+                            <input type="hidden" name="validk" id="valasztottak2" value=""/>
+                            <div class="row">
+                                <div class="col-6">
+                                    <input type="submit" class="btn btn-outline-info" value="Alkalmaz" />
+                                </div>
+                                <div class="col-6">
+                                    <input type="reset" class="btn btn-outline-primary" onclick="selectAll()" value="Mindent választ"></input>
+                                </div>
+                            </div>
                         </form>
                         <form method="POST" action="/savecal" style="margin-top:1rem;">
                             <input type="hidden" name="usnamepost" value="{{ usname }}" />
-                            <label for="valasztottak" class="form-label">Kiválasztott azonosítók:</label>
-                            <input type="text" class="form-control form-control-lg disabled" name="valasztottak" id="valasztottak" value="" readonly />
-                            <small for="valasztottak" class="form-text text-mutes">Itt csak az IDket írja, szóval ez csak ilyen debugra van itt :D</small>
-                            <br/><br/>
-                            <input type="submit" class="btn btn-success" value="Mentés" />
+                            <label for="valasztottak" id="valasztottakDarab" class="form-label">Kiválasztva: 0 db kártya</label>
+                            <div class="alert alert-warning d-none" role="alert" id="alertBox">
+                                null
+                            </div>
+                            <input type="hidden" name="valasztottak" id="valasztottak1" value=""/>
+                            <input type="hidden" name="elerheto" id="elerheto" value="{{ elerhetoKartyaIdk }}"/>
+                            <div class="row">
+                                <div class="col-6">
+                                    <input type="submit" class="btn btn-success" value="Mentés" />
+                                </div>
+                                <div class="col-6">
+                                    <input type="reset" class="btn btn-warning" value="Alaphelyzet" onclick="clearSelections()" />
+                                </div>
+                            </div>
                         </form>
                         <br/>
-                        <input type="submit" class="btn btn-warning" value="Alaphelyzet" onclick="clearSelections()" />
-                        <br/><br/>
                         <small>Adatbázis lekérve: {{ lasthit }}</small>
                     </div>
-                    <div id="loader" class="col-md-10 text-center align-content-center"><img src="/static/grid.svg" alt="Töltök..." style="margin-top:2rem;"/></div>
-                    <div class="col-md-10 d-none" style="padding-top:1rem;display:none" id="underLoader">
-                        <div class="row row-cols-2 row-cols-md-4 g-4">
-                            {% if kartyahossz != 0 %}
+                    <div id="loader" class="col-md-9 text-center align-content-center"><img src="/static/grid.svg" alt="Töltök..." style="margin-top:2rem;"/></div>
+                    <div class="col-md-9 d-none" style="padding-top:1rem;display:none" id="underLoader">                        
+                        <div class="row {% if kartyahossz > 0 %} row-cols-2 row-cols-md-4 g-4 {% endif %} ">
+                            {% if startpg == True %}
+                                {% if kartyahossz == 0 %}
+                                    <h2>Köszöntelek a Tábla Exportban!</h2><p>A bal oldali szűrő segítségével tudod megkeresni, majd kiválogatni a kártyákat, melyek itt fognak majd megjelenni a kezdőoldalon. A bal alsó mentés gomb segítségével .ics (iCal) formátumba tudod exportálni a kártyákat, melyeket a legtöbb modern naptár alkalmazás képes felismerni, és periodikusan frissíteni.<br/><br/><strong>Fontos, ha voltak már kiválasztva kártyák, de nem jelentek meg, kattints csak üres mezőkkel az alkalmaz gombra, és fel fogja dobni őket a rendszer :)</strong></p>
+                                    <p style="margin-top:1rem;">Újdonságok ebben a verzióban:<br/>Mostantól az ismeretlen időpontban, vagy ismeretlen napon történő órákat a rendszer pirossal jelöli, illetve nem engedi naptárba menteni. Ezek mellett a kezdőképernyőn megjelennek a kiválasztott kártyák sorrendben, melyeket ki is lehet szedni ha már nincs rá szükség. :3</p>
+                                {% else %}
+                                    {% for sor in kartyadatok %}
+                                        <div class="col">
+                                            <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-danger {% endif %}" id="card{{ sor[-1] }}">
+                                                <div class="card-header text-left">
+                                                    {{ sor[0] }} - {{ sor[2] }} <br/> [{{ sor[7] }}]
+                                                </div>
+                                                <div class="card-body">
+                                                    <p class="card-text">{{ sor[3] }}<br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
+                                                    {% if sor[0] != 'ismeretlen' and sor[2] != 'ismeretlen' %}
+                                                    <button onclick="pickThis('{{ sor[-1] }}', false)" id="picker{{ sor[-1] }}" class="btn btn-outline-primary">Választ</button>
+                                                    {% else %}
+                                                    <button id="picker{{ sor[-1] }}" class="btn btn-dark">Nem választhatod ki</button>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            {% elif kartyahossz != 0 %}
                                 {% for sor in kartyadatok %}
                                     <div class="col">
                                         <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-danger {% endif %}" id="card{{ sor[-1] }}">
@@ -112,6 +150,7 @@
                 {% endif %}
             </div>
         </main>
+        <br/>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
     </body>
 </html> 
