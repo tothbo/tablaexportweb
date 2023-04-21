@@ -3,7 +3,6 @@ function sleep(ms) {
 }
 
 async function selectAll(){
-    debugger;
     let idstr = document.getElementById('elerheto').value;
     if(idstr == 'null'){
         document.getElementById('alertBox').innerText = 'Nincsenek kártyák, amiket ki lehetett volna választani, vagy nem szűrtél rá semmire.';
@@ -49,6 +48,14 @@ async function redoSelections(){
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    debugger;
+    if(localStorage.getItem('newsID') == null || localStorage.getItem('newsID') != "0"){
+        localStorage.setItem('newsID', '0')
+        const myModal = new bootstrap.Modal('#newsModal', {
+            show: true
+        })
+        myModal.show()
+    }
     redoSelections();
  }, false);
 

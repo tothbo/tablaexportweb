@@ -5,7 +5,6 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{{ name }} > Tábla Export</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
-        <script type="text/javascript" src="/static/cardPicker.js"></script>
         <style>
             @keyframes slideInFromBottom {
                 0% {
@@ -21,7 +20,7 @@
         </style>
     </head> 
     <body>
-        <main class="container-fluid" id="main">
+        <main class="container-fluid" id="main" style="margin-top:0.5rem;">
             <div class="row">
                 {% if usname == "" %}
                     <h1 class="text-center" style="size:1rem;">Üdv, ismeretlen vándor!</h1>
@@ -71,8 +70,9 @@
                                     <input type="submit" class="btn btn-outline-info" value="Alkalmaz" />
                                 </div>
                                 <div class="col-6">
-                                    <input type="reset" class="btn btn-outline-primary" onclick="selectAll()" value="Mindent választ"></input>
+                                    <input id="selall" type="reset" class="btn btn-outline-primary" onclick="selectAll()" value="Mindent választ"></input>
                                 </div>
+                                <small id="selall" class="form-text text-muted">A mindent választ opció csak az órákat választja ki, a vizsgákat nem válogatja bele (azokat külön tudod választani, melyik kell).</small>
                             </div>
                         </form>
                         <form method="POST" action="/savecal" style="margin-top:1rem;">
@@ -100,17 +100,16 @@
                         <div class="row {% if kartyahossz > 0 %} row-cols-2 row-cols-md-4 g-4 {% endif %} ">
                             {% if startpg == True %}
                                 {% if kartyahossz == 0 %}
-                                    <h2>Köszöntelek a Tábla Exportban!</h2><p>A bal oldali szűrő segítségével tudod megkeresni, majd kiválogatni a kártyákat, melyek itt fognak majd megjelenni a kezdőoldalon. A bal alsó mentés gomb segítségével .ics (iCal) formátumba tudod exportálni a kártyákat, melyeket a legtöbb modern naptár alkalmazás képes felismerni, és periodikusan frissíteni.<br/><br/><strong>Fontos, ha voltak már kiválasztva kártyák, de nem jelentek meg, kattints csak üres mezőkkel az alkalmaz gombra, és fel fogja dobni őket a rendszer :)</strong></p>
-                                    <p style="margin-top:1rem;">Újdonságok ebben a verzióban:<br/>Mostantól az ismeretlen időpontban, vagy ismeretlen napon történő órákat a rendszer pirossal jelöli, illetve nem engedi naptárba menteni. Ezek mellett a kezdőképernyőn megjelennek a kiválasztott kártyák sorrendben, melyeket ki is lehet szedni ha már nincs rá szükség. :3</p>
+                                    <h2>csend és rend...</h2><p>senki nincs se közel se távol - vagy mégis? ha a semmire rászűrsz, kinyílik a titkok kamrája. booo...</p>
                                 {% else %}
                                     {% for sor in kartyadatok %}
                                         <div class="col">
-                                            <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-danger {% endif %}" id="card{{ sor[-1] }}">
+                                            <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-secondary {% endif %}" id="card{{ sor[-1] }}">
                                                 <div class="card-header text-left">
-                                                    {{ sor[0] }} - {{ sor[2] }} <br/> [{{ sor[7] }}]
+                                                    {% if 'Típus:' in sor[6] %} 🎓 {% endif %}<strong>{{ sor[0] }} - {{ sor[2] }}</strong> <br/> [{{ sor[7] }}]
                                                 </div>
                                                 <div class="card-body">
-                                                    <p class="card-text">{{ sor[3] }}<br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
+                                                    <p class="card-text"><strong>{{ sor[3] }}</strong><br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
                                                     {% if sor[0] != 'ismeretlen' and sor[2] != 'ismeretlen' %}
                                                     <button onclick="pickThis('{{ sor[-1] }}', false)" id="picker{{ sor[-1] }}" class="btn btn-outline-primary">Választ</button>
                                                     {% else %}
@@ -124,12 +123,12 @@
                             {% elif kartyahossz != 0 %}
                                 {% for sor in kartyadatok %}
                                     <div class="col">
-                                        <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-danger {% endif %}" id="card{{ sor[-1] }}">
+                                        <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-secondary {% endif %}" id="card{{ sor[-1] }}">
                                             <div class="card-header text-left">
-                                                {{ sor[0] }} - {{ sor[2] }} <br/> [{{ sor[7] }}]
+                                                {% if 'Típus:' in sor[6] %} 🎓 {% endif %} <strong>{{ sor[0] }} - {{ sor[2] }}</strong> <br/> [{{ sor[7] }}]
                                             </div>
                                             <div class="card-body">
-                                                <p class="card-text">{{ sor[3] }}<br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
+                                                <p class="card-text"><strong>{{ sor[3] }}</strong><br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
                                                 {% if sor[0] != 'ismeretlen' and sor[2] != 'ismeretlen' %}
                                                 <button onclick="pickThis('{{ sor[-1] }}', false)" id="picker{{ sor[-1] }}" class="btn btn-outline-primary">Választ</button>
                                                 {% else %}
@@ -151,6 +150,35 @@
             </div>
         </main>
         <br/>
+        {% if usname != "" %}
+            <div class="modal fade" id="newsModal" tabindex="-1" aria-labelledby="newsModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h1 class="modal-title fs-5" id="newsModalLabel">Frissítések</h1>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p><strong>Csodálatos tavaszi napra virradtunk a világ minden táján.</strong> Lassan megérkezik a május, közelednek az utolsó zárthelyik, valamint a vizsgák is úton vannak már, ezért mi se lenne jobb időpont egy Tábla-Export frissítéshez :D<br/><i>(ha nem érdekel, akkor jobb fent a kis X-re kattintva tudod ezt eltüntetni)</i><br/>
+                                <ul>
+                                    <li>
+                                        Ebben a verzióban nem csak megújult a frissítések megjelenítése, de lehetőséged van már a vizsgák táblázatának tartalmát is megnyitnod, valamint a naptárba beválogatni.
+                                    </li><li>
+                                        Ezek mellett megújult a kártyák rendezése, az eddigi "ahogy esik, úgy puffan, kábé sorban van" helyett ténylegesen időrendben követik egymást az órák - melynek megvan a pozitív előnye, hogy az ismeretlen dátumú órák a legvégére kerülnek, nem lesznek zavaróan minden közé bebújtatva.
+                                    </li><li>
+                                        Az ismeretlen dátumokról beszélve, az eddigi vörös háttér sötét szürkére lett cserélve, hogy ne vegye el a figyelmet a ténylegesen hasznos kártyákról.
+                                    </li><li>
+                                        Végül, de nem utolsó sorban, a mindent választ gomb is "megújult" - pontosítva maradt a régi funkciójánál, mostantól minden órát választ ki, nem minden választható kártyát a képernyőn (de későbbiekben lehet bele fog kerülni egy plussz ténylegesen mindent választ funkció is).
+                                    </li>
+                                </ul>
+                                Csodálatos hétvégét, jó készülődést :3
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <script type="text/javascript" src="/static/cardPicker.js"></script>
+        {% endif %}
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
     </body>
 </html> 

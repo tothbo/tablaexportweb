@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, request, redirect, url_for, send_file
+from flask import Flask, render_template, session, request, redirect, url_for, send_file, send_from_directory
 from icalendar import Calendar, Event, vCalAddress, vText
 from pathlib import Path
 from office365.runtime.auth.authentication_context import AuthenticationContext
@@ -28,6 +28,9 @@ class KartyAdatok():
         pass
     def addRow(self, s) -> None:
         self.data.append(s)
+    def debugPrinter(self) -> None:
+        for x in self.data:
+            print(x)
     def getLength(self) -> int:
         return len(self.data)
     def getDataById(self, id) -> list:
@@ -38,17 +41,19 @@ class KartyAdatok():
     def felsorolo(self) -> str:
         a = []
         for x in self.data:
-            if(x[0] == 'ismeretlen' or x[0] == '' or x[0] == ' ' or x[2] == 'ismeretlen' or x[2] == '' or x[2] == ' '):
+            if(x[0] == 'ismeretlen' or x[0] == '' or x[0] == ' ' or x[2] == 'ismeretlen' or x[2] == '' or x[2] == ' ' or 'Típus:' in x[6]):
                 continue
             a.append(str(x[-1]))
         return ";".join(a)
     def recalculate(self) -> None:
         WB = openpyxl.load_workbook("dl.xlsx", True)
+        WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
         self.data = []
 
         try:
             # félév váltásnál ezt át kell írni!
             SH = WB["2023tavasz"]
+            SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
         except Exception as e:
             print("Exception occoured while trying to get the workbook. It's basicly the following: "+str(e))
             return
@@ -78,8 +83,42 @@ class KartyAdatok():
             lst = interlist
             self.data.append(interlist)
             i += 1
+        
+        print("  > last row hit at "+str(lst)+", with id "+str(lst[-1]))
 
-        print("  last row hit at "+str(lst)+", with id "+str(lst[-1]))
+        for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+            interlist = []
+            frow = True
+
+            if(row[3].value == "" or row[3].value == " "):
+                break
+            elif((row[3].value == "EmptyCell" or row[3].value is None) and (row[0].value == "EmptyCell" or row[0].value is None)):
+                break
+
+            countr = 0
+            trl = ''
+
+            for cell in row:
+                if(frow and type(cell.value) == datetime.datetime):
+                    interlist.append(cell.value.strftime('%Y-%m-%d'))
+                    frow = False
+                elif(frow):
+                    interlist.append("ismeretlen")
+                    frow = False
+                elif(type(cell.value) == None or cell.value == None):
+                    interlist.append("ismeretlen")
+                else:
+                    interlist.append(cell.value)
+
+            rebindls = [interlist[0],interlist[1],interlist[2],interlist[3],interlist[4],interlist[5],"Típus: "+interlist[7],interlist[6],i]
+            lst = rebindls
+            self.data.append(rebindls)
+            i += 1
+
+        #self.debugPrinter()
+        self.data = sorted(self.data, key=lambda x: (x[0], x[2]))
+
+        print("  > last row hit at "+str(lst)+", with id "+str(lst[-1]))
         print("Recalculated the workbook, now it has "+str(len(self.data))+" rows.")
 
 def calcMax(databs) -> KartyAdatok:
@@ -96,7 +135,10 @@ def calcFilterID(databs, hasznosDatumok, filterRowId='null'):
     for rid in filterRowId.split(";"):
         if(rid == '' or rid == ' '):
             continue
-        outdb.addRow(databs.data[int(rid)])
+        for x in databs.data:
+            if x[-1] == int(rid):
+                outdb.addRow(x)
+                break
     return outdb
 
 def calcFilter(databs, hasznosDatumok, filterDateId='null', filterTargykod='null', filterTargynev='null', filterKurz='null') -> KartyAdatok:
@@ -146,7 +188,7 @@ def refreshExcel():
         f.close()
         datelast = datetime.datetime.now()
 
-    datext = datetime.datetime.now() - datetime.timedelta(days=1)
+    datext = datetime.datetime.now() - datetime.timedelta(hours=12)
 
     if(datelast >= datext):
         print("Shouldn't refresh table: it's not too old")
@@ -173,6 +215,16 @@ def refreshExcel():
         file.download(local_file)
         ctx.execute_query()
     print(f" Excel refreshed: {file_path}")
+
+    file_url = "/sites/GTKstudents/Megosztott%20dokumentumok/Szamonkeresek/ELTE_GTK_Szamonkeres_idopontok_2023_tavasz.xlsx"
+    filename = "dlvizs.xlsx"
+
+    file_path = os.path.abspath(filename)
+    with open(file_path, "wb") as local_file:
+        file = ctx.web.get_file_by_server_relative_url(file_url)
+        file.download(local_file)
+        ctx.execute_query()
+    print(f" Excel refreshed: {file_path}")
     db.recalculate()
     return True
 
@@ -180,19 +232,42 @@ def refreshExcel():
 
 def calcHasznosDatumok():
     WB = openpyxl.load_workbook("dl.xlsx", True)
+    WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
     hasznosDatumok = []
     dates = []
     naps = []
 
     try:
         SH = WB["2023tavasz"]
+        SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
     except Exception as e:
         return ["2000-01-01"]
     
     for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
         if(row[0].value == None or row[0].value == "" or row[0].value == " "):
             continue
-        run = 0
+        if row[0].value not in dates:
+            dates.append(row[0].value)
+            if(row[1].value == "Monday"):
+                naps.append("hétfő")
+            elif(row[1].value == "Tuesday"):
+                naps.append("kedd")
+            elif(row[1].value == "Wednesday"):
+                naps.append("szerda")
+            elif(row[1].value == "Thursday"):
+                naps.append("csütörtök")
+            elif(row[1].value == "Friday"):
+                naps.append("péntek")
+            elif(row[1].value == "Saturday"):
+                naps.append("szombat")
+            elif(row[1].value == "Sunday"):
+                naps.append("vasárnap")
+            else:
+                naps.append(row[1].value)
+
+    for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+        if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+            continue
         if row[0].value not in dates:
             dates.append(row[0].value)
             if(row[1].value == "Monday"):
@@ -235,7 +310,7 @@ def refresh(name="Frissítés"):
         db.recalculate
         return redirect("/?sikeresen_frissitettem_a_tablat")
     db.recalculate
-    return redirect("/?nem_tudom_frissiteni_a_tablat_mert_nem_telt_el_24_ora")
+    return redirect("/?nem_tudom_frissiteni_a_tablat_mert_nem_telt_el_12_ora")
 
 @app.route('/savecal', methods = ['GET', 'POST'])
 def savecal(name="Naptár exportálása", usname="", feldolg=[]):
@@ -243,6 +318,12 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
     if(request.method == "POST"):
         print("Írás megkezdése naptárba: "+request.form['usnamepost'])
         cal = Calendar()
+        dct = {
+            "desc":"Tábla Export JSON fájl",
+            "expversion":"0",
+            "for_user":request.form['usnamepost'],
+            "entries":[]
+        }
         cal.add('prodid', '-//Órarend//Exportalva ide: '+request.form['usnamepost']+'//')
         cal.add('version', '2.0')
         cal.add('x-wr-timezone', 'Europe/Budapest')
@@ -259,17 +340,35 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
                 feldolg.append(["Hiba történt az elem feldolgozása közben: nem rendelkezik dátummal az adott kártya, így nem tudom naptárba tenni.", i])
             else:
                 sor = db.getDataById(int(i))
+                print("van sorunk")
+                print(sor)
                 try:
                     event = Event()
+                    dt = {
+                        "date":sor[0],
+                        "from":sor[2].split("-")[0],
+                        "to":sor[2].split("-")[1],
+                        "location":sor[7],
+                        "course_name":sor[3],
+                        "course_code":sor[5],
+                        "subj_code":sor[4],
+                        "groups":sor[6],
+                        "id":sor[-1]
+                    }
 
-                    event.add('summary', sor[3]+" > ["+sor[7]+"]")
-                    event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>Csoport: "+sor[6]+"<br/>Oktató(k): "+sor[11]+"<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
+                    event.add('summary', "🎓 "+sor[3]+" > ["+sor[7]+"]")
+                    if "Típus:" in sor[6]:
+                        event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>"+sor[7]+"<br/>Kalappal :3<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
+                    else:
+                        event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>Csoport: "+sor[6]+"<br/>Oktató(k): "+sor[11]+"<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
                     event.add('dtstart', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[0], '%Y-%m-%d %H:%M'))
                     event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[1], '%Y-%m-%d %H:%M')) 
                     event.add('priority', 5)
                     event['uid'] = '2023tavasz/ID'+str(sor[-1])
                     event['location'] = vText(sor[7])
                     cal.add_component(event)
+
+                    dct["entries"].append(dt)
                 except Exception as e:
                     feldolg.append(["Hiba történt az elem feldolgozása közben: "+str(e), i])
                     print("  > naptárhiba: "+str(e))
@@ -284,6 +383,11 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
         f = open(os.path.join(directory, request.form['usnamepost']+'.ics'), 'wb')
         f.write(cal.to_ical())
         f.close()
+
+        jsonobj = json.dumps(dct, indent=4, ensure_ascii=False).encode('utf-8')
+
+        with open("./tarolo/"+request.form['usnamepost']+".json", "wb") as outfile:
+            outfile.write(jsonobj)
 
         print("Export done, everything went right!")
         return render_template('savecal.html', name=name, usname=request.form['usnamepost'], feldolg=feldolg, feldolghossz=len(feldolg))
@@ -319,7 +423,7 @@ def index(name="Index", usname=""):
                     print("Tried to get the validk, but it threw an Exception: "+str(e))
                     raise SystemExit
                 try:
-                    selectdb = calcFilterID(db,interHasznDatumok, validk)
+                    selectdb = calcFilterID(db, interHasznDatumok, validk)
                 except Exception as e:
                     print("Error in selectdb, e:"+str(e))
                 return render_template(
@@ -396,32 +500,31 @@ def index(name="Index", usname=""):
     )
 
 ## fájlok
-
-@app.route('/cals/alma.ics', methods = ['GET', 'POST'])
-def calsalma():
+@app.route('/cals/<path:path>')
+def serve_cals(path):
     try:
-        return send_file(os.getcwd()+'/cals/alma.ics')
+        return send_from_directory(os.getcwd()+'/cals', path)
+    except Exception as e:
+        return str(e) 
+
+@app.route('/tarolo/<path:path>')
+def serve_tarolo(path):
+    try:
+        return send_from_directory(os.getcwd()+'/tarolo', path)
     except Exception as e:
         return str(e)
     
-@app.route('/cals/naptr1bPdl.ics', methods = ['GET', 'POST'])
-def calsnaptr1bPdl():
+@app.route('/static/<path:path>')
+def serve_static(path):
     try:
-        return send_file(os.getcwd()+'/cals/naptr1bPdl.ics')
-    except Exception as e:
-        return str(e)
-    
-@app.route('/static/cardPicker.js', methods = ['GET', 'POST'])
-def staticcardpicker():
-    try:
-        return send_file(os.getcwd()+'/static/cardPicker.js')
+        return send_from_directory(os.getcwd()+'/static', path)
     except Exception as e:
         return str(e)
 
-@app.route('/static/grid.svg', methods=['GET', 'POST'])
-def staticgrid():
+@app.route('/favicon.ico', methods = ['GET', 'POST'])
+def favicon():
     try:
-        return send_file(os.getcwd()+'/static/grid.svg')
+        return send_file(os.getcwd()+'/static/favicon.ico')
     except Exception as e:
         return str(e)
 
@@ -431,6 +534,13 @@ def robotstxt():
         return send_file(os.getcwd()+'/static/robots.txt')
     except Exception as e:
         return str(e)
+
+@app.errorhandler(404)
+def err404(e):
+    try:
+        return render_template('404.html')
+    except Exception as excp:
+        return str(excp)
 
 # ez indítja az actual servinget
 if __name__ == "__main__":
