@@ -356,16 +356,19 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
                         "id":sor[-1]
                     }
 
-                    event.add('summary', "🎓 "+sor[3]+" > ["+sor[7]+"]")
                     if "Típus:" in sor[6]:
+                        event.add('summary', "🎓 "+sor[3]+" > ["+sor[7]+"]")
                         event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>"+sor[7]+"<br/>Kalappal :3<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
                     else:
+                        event.add('summary', sor[3]+" > ["+sor[7]+"]")
                         event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>Csoport: "+sor[6]+"<br/>Oktató(k): "+sor[11]+"<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
+                    
                     event.add('dtstart', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[0], '%Y-%m-%d %H:%M'))
                     event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[1], '%Y-%m-%d %H:%M')) 
                     event.add('priority', 5)
                     event['uid'] = '2023tavasz/ID'+str(sor[-1])
                     event['location'] = vText(sor[7])
+                    
                     cal.add_component(event)
 
                     dct["entries"].append(dt)

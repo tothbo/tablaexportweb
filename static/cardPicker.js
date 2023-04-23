@@ -48,7 +48,6 @@ async function redoSelections(){
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    debugger;
     if(localStorage.getItem('newsID') == null || localStorage.getItem('newsID') != "0"){
         localStorage.setItem('newsID', '0')
         const myModal = new bootstrap.Modal('#newsModal', {
