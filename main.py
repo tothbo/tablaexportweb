@@ -9,6 +9,7 @@ import pytz, openpyxl, os, sys, json
 os.environ['TZ'] = 'Europe/Budapest'
 
 config = ""
+expversion = '1'
 
 # itt tároljuk el a belépési adatokat a SharePointhoz. Mivel a fejlesztés Windowson, az éles/teszt környezet pedig Linuxon (Ubuntu 22) volt/van,
 # ezért linuxon a configok között eltárolt json fájlt, developmenthez pedig a lokális jsont használjuk (így a publikus internetre nem kerül ki a jelszó,
@@ -228,6 +229,54 @@ def refreshExcel():
     db.recalculate()
     return True
 
+## összehasonlítja a tárolt órarendet (ami jsonben van) a jelenlegi órarendel, majd feldobja a választ
+
+def calcDiff(db:KartyAdatok, username:str) -> list:
+    f = open(os.getcwd()+'/tarolo/'+username+'.json', encoding='utf-8')
+    oldjs = json.load(f)
+    backdb = []
+
+    if(oldjs['expversion'] != expversion):
+        raise Exception("Export version missmatch.")
+
+    for x in oldjs['entries']:
+        sor = db.getDataById(x['id'])
+        if("." in sor[2]):
+            dt = {
+                "date":sor[0],
+                "from":sor[2].split(".")[0],
+                "to":sor[2].split(".")[1],
+                "location":sor[7],
+                "course_name":sor[3],
+                "course_code":sor[5],
+                "subj_code":sor[4],
+                "groups":sor[6],
+                "id":sor[-1]
+            }
+        else:
+            dt = {
+                "date":sor[0],
+                "from":sor[2].split("-")[0],
+                "to":sor[2].split("-")[1],
+                "location":sor[7],
+                "course_name":sor[3],
+                "course_code":sor[5],
+                "subj_code":sor[4],
+                "groups":sor[6],
+                "id":sor[-1]
+            }
+
+        if(x['date'] != dt['date'] or x['course_name'] != dt['course_name'] or x['course_code'] != dt['course_code'] or x['subj_code'] != dt['subj_code'] or (x['location'] != dt['location'] and (x['from'] != dt['from'] or x['to'] != dt['to']))):
+            backdb.append(["Fő tulajdonság-változás: valószínűleg elcsúszott a táblázat", x, dt])
+        elif(x['from'] != dt['from'] or x['to'] != dt['to']):
+            backdb.append(["Kezdő és/vagy végdátum változás", x, dt])
+        elif(x['location'] != dt['location']):
+            backdb.append(["Teremváltozás", x, dt])
+        elif(x['groups'] != dt['groups']):
+            backdb.append(["Csoportváltozás", x, dt])
+
+    return backdb
+    
 ## itt számoljuk ki a hasznos dátumokat > azokat amiket meg is fogunk jeleníteni a dropdownban
 
 def calcHasznosDatumok():
@@ -312,15 +361,26 @@ def refresh(name="Frissítés"):
     db.recalculate
     return redirect("/?nem_tudom_frissiteni_a_tablat_mert_nem_telt_el_12_ora")
 
+@app.route('/diff', methods = ['GET', 'POST'])
+def diff(name="Órarendváltozás-ellenőrzés"):
+    try:
+        a = request.form['username']
+        print(a)
+    except Exception as e:
+        print(e)
+        return render_template('diff.html', resp=False, usname="", diffdb=[])
+    d = calcDiff(db, a)
+    return render_template('diff.html', resp=True, usname=a, diffdb=d)
+
 @app.route('/savecal', methods = ['GET', 'POST'])
 def savecal(name="Naptár exportálása", usname="", feldolg=[]):
     feldolg=[]
     if(request.method == "POST"):
-        print("Írás megkezdése naptárba: "+request.form['usnamepost'])
+        #print("Írás megkezdése naptárba: "+request.form['usnamepost'])
         cal = Calendar()
         dct = {
             "desc":"Tábla Export JSON fájl",
-            "expversion":"0",
+            "expversion":"1",
             "for_user":request.form['usnamepost'],
             "entries":[]
         }
@@ -328,43 +388,58 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
         cal.add('version', '2.0')
         cal.add('x-wr-timezone', 'Europe/Budapest')
         esemenyek = request.form['valasztottak'].split(";")
-        print(esemenyek)
+        #print(esemenyek)
         if(len(esemenyek) == 0):
-            print("Üres esemenyek lista :()")
+            #print("Üres esemenyek lista :()")
             return render_template('savecal.html', name=name, usname=request.form['usnamepost'], feldolg=["Üres volt a lekérés (nem tartalmazott egyetlen eseményt sem).", "0"], feldolghossz=1)
         for i in esemenyek:
             if(i == "" or i == " "):
                 continue
             if(db.getDataById(int(i))[0] == "" or db.getDataById(int(i))[0] == " " or db.getDataById(int(i))[0] == None):
-                print("  > feldolgozási hiba, ez nem dátum: "+str(db.getDataById(int(i))[0])+" itt: "+str(i)+" hanem "+str(type(db.getDataById(int(i))[0]))+".")
+                #print("  > feldolgozási hiba, ez nem dátum: "+str(db.getDataById(int(i))[0])+" itt: "+str(i)+" hanem "+str(type(db.getDataById(int(i))[0]))+".")
                 feldolg.append(["Hiba történt az elem feldolgozása közben: nem rendelkezik dátummal az adott kártya, így nem tudom naptárba tenni.", i])
             else:
                 sor = db.getDataById(int(i))
-                print("van sorunk")
-                print(sor)
+                #print("van sorunk")
+                #print(sor)
                 try:
                     event = Event()
-                    dt = {
-                        "date":sor[0],
-                        "from":sor[2].split("-")[0],
-                        "to":sor[2].split("-")[1],
-                        "location":sor[7],
-                        "course_name":sor[3],
-                        "course_code":sor[5],
-                        "subj_code":sor[4],
-                        "groups":sor[6],
-                        "id":sor[-1]
-                    }
-
                     if "Típus:" in sor[6]:
                         event.add('summary', "🎓 "+sor[3]+" > ["+sor[7]+"]")
                         event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>"+sor[7]+"<br/>Kalappal :3<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
                     else:
                         event.add('summary', sor[3]+" > ["+sor[7]+"]")
                         event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>Csoport: "+sor[6]+"<br/>Oktató(k): "+sor[11]+"<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
+
+                    if("." in sor[2]):
+                        dt = {
+                            "date":sor[0],
+                            "from":sor[2].split(".")[0],
+                            "to":sor[2].split(".")[1],
+                            "location":sor[7],
+                            "course_name":sor[3],
+                            "course_code":sor[5],
+                            "subj_code":sor[4],
+                            "groups":sor[6],
+                            "id":sor[-1]
+                        }
+                        event.add('dtstart', datetime.datetime.strptime(sor[0]+" "+sor[2].split(".")[0], '%Y-%m-%d %H:%M'))
+                        event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split(".")[1], '%Y-%m-%d %H:%M')) 
+                    else:
+                        dt = {
+                            "date":sor[0],
+                            "from":sor[2].split("-")[0],
+                            "to":sor[2].split("-")[1],
+                            "location":sor[7],
+                            "course_name":sor[3],
+                            "course_code":sor[5],
+                            "subj_code":sor[4],
+                            "groups":sor[6],
+                            "id":sor[-1]
+                        }
+                        event.add('dtstart', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[0], '%Y-%m-%d %H:%M'))
+                        event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[1], '%Y-%m-%d %H:%M')) 
                     
-                    event.add('dtstart', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[0], '%Y-%m-%d %H:%M'))
-                    event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[1], '%Y-%m-%d %H:%M')) 
                     event.add('priority', 5)
                     event['uid'] = '2023tavasz/ID'+str(sor[-1])
                     event['location'] = vText(sor[7])

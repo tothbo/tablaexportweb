@@ -2,6 +2,7 @@
 <html>
     <head>
         <meta charset="utf-8" />
+        <meta lang="HU" />
         <meta name="description" content="Tábla export főoldal">
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -95,6 +96,12 @@
                                 </div>
                             </div>
                         </form>
+                        <form method="POST" action="/diff" class="row" style="margin-top:1rem;">
+                            <div class="col">
+                                <input type="hidden" name="username" value="{{ usname }}" />
+                                <input type="submit" class="btn btn-outline-primary" value="Változás-ellenőrzés" />
+                            </div>
+                        </form>
                         <br/>
                         <small>Adatbázis lekérve: {{ lasthit }}</small>
                     </div>
@@ -103,7 +110,7 @@
                         <div class="row {% if kartyahossz > 0 %} row-cols-2 row-cols-md-4 g-4 {% endif %} ">
                             {% if startpg == True %}
                                 {% if kartyahossz == 0 %}
-                                    <h2>csend, rend és fegyelem</h2><p>senki sincs se közel se távol - vagy mégis? ha a semmire rászűrsz, kinyílhat a titkok kamrája. boooo...</p>
+                                    <h2>Üdv újra a Tábla Exportban!</h2><p>Rég láttalak itt! Mielőtt nekiállsz újra összepakolni mindent, érdemes összehasonlítani az előző verzió naptárát a jelenlegi táblázattal. ;-)</p>
                                 {% else %}
                                     {% for sor in kartyadatok %}
                                         <div class="col">
@@ -162,19 +169,15 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            <p><strong>Csodálatos tavaszi napra virradtunk a világ minden táján.</strong> Lassan megérkezik a május, közelednek az utolsó zárthelyik, valamint a vizsgák is úton vannak már, ezért mi se lenne jobb időpont egy Tábla-Export frissítéshez :D<br/><i>(ha nem érdekel, akkor jobb fent a kis X-re kattintva tudod ezt eltüntetni)</i><br/>
+                            <p><strong>Hotfix</strong><br/><i>(a jobb felső sarokban lévő X-el tudod bezárni ezt az ablakot)</i><br/>
                                 <ul>
                                     <li>
-                                        Ebben a verzióban nem csak megújult a frissítések megjelenítése, de lehetőséged van már a vizsgák táblázatának tartalmát is megnyitnod, valamint a naptárba beválogatni.
+                                        A bejövő táblázat tartalmaz hibás sorokat, ezek utójavítása megtörtént.
                                     </li><li>
-                                        Ezek mellett megújult a kártyák rendezése, az eddigi "ahogy esik, úgy puffan, kábé sorban van" helyett ténylegesen időrendben követik egymást az órák - melynek megvan a pozitív előnye, hogy az ismeretlen dátumú órák a legvégére kerülnek, nem lesznek zavaróan minden közé bebújtatva.
-                                    </li><li>
-                                        Az ismeretlen dátumokról beszélve, az eddigi vörös háttér sötét szürkére lett cserélve, hogy ne vegye el a figyelmet a ténylegesen hasznos kártyákról.
-                                    </li><li>
-                                        Végül, de nem utolsó sorban, a mindent választ gomb is "megújult" - pontosítva maradt a régi funkciójánál, mostantól minden órát választ ki, nem minden választható kártyát a képernyőn (de későbbiekben lehet bele fog kerülni egy plussz ténylegesen mindent választ funkció is).
+                                        Összehasonlítás funkció javítva.
                                     </li>
                                 </ul>
-                                Csodálatos hétvégét, jó készülődést :3
+                                Szép napot mindenkinek :3
                             </p>
                         </div>
                     </div>

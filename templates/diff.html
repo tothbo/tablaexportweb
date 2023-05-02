@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="description" content="Tábla export főoldal">
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Órarend-változás kereső > Tábla Export</title>
+        <link rel="manifest" href="/static/manifest.json">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+    </head> 
+    <body>
+        <main class="container-fluid" id="main" style="margin-top:0.5rem;">
+            <div class="row">
+                {% if resp == False %}
+                    <h1 class="text-center" style="size:1rem;">Nem sikerült a lekérést teljesíteni</h1>
+                    <div class="col text-center">
+                        <p>Sajnos nem sikerült az összehasonlítás: vagy nem megfelelő az exportverziód (értsd: a jelenlegi naptárad még nem az új, 1-es formátumot, hanem a régi, 0-ás formátumot használta, amik nem tároltak el minden szükséges adatot), vagy túl nagy csúszás van a naptárban.</p>
+                    </div>
+                {% elif diffdb == [] %}
+                    <h1 class="text-center" style="size:1rem;">Nem találtam változást az órarendben</h1>
+                    <div class="col text-center">
+                        <p>Ha szeretnéd újra letölteni a naptárat:<br/></p>
+                        <p><a href="https://tablaexport.csordanyom.hu/cals/{{ usname }}.ics">https://tablaexport.csordanyom.hu/cals/{{ usname }}.ics</a></p><br/>
+                        <p>Ha szeretnéd megtekinteni a JSON fájlt, amely alapján az összehasonlítás történt:</p>
+                        <p><a href="https://tablaexport.csordanyom.hu/tarolo/{{ usname }}.json">https://tablaexport.csordanyom.hu/tarolo/{{ usname }}.json</a></p>
+                    </div>
+                {% else %}
+                    <h1 class="text-center" style="size:1rem;">Órarend-változás kereső</h1>
+                    <p>Az alábbi változásokat találtam:</p>
+                        <div class="accordion" id="diffLista">
+                        {% for x in diffdb %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="acrd{{ x[1]['id'] }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#coll{{ x[1]['id'] }}" aria-expanded="false" aria-controls="coll{{ x[1]['id'] }}">
+                                    {{ x[0] }} itt: {{ x[1]['course_name'] }}
+                                </button>
+                                </h2>
+                                <div id="coll{{ x[1]['id'] }}" class="accordion-collapse collapse" aria-labelledby="acrd{{ x[1]['id'] }}" data-bs-parent="#diffLista">
+                                <div class="accordion-body row">
+                                    <div class="col-6">
+                                        <p class="text-center"><strong>Eredeti (jelenleg naptárban lévő)</strong></p>
+                                        <p>{{ x[1]['date'] }}, {{ x[1]['from'] }} > {{ x[1]['to'] }}<br/><br/>{{ x[1]['location'] }}<br/>{{ x[1]['course_code'] }}<br/>{{ x[1]['course_name'] }}<br/>{{ x[1]['subj_code'] }}<br/>{{ x[1]['groups'] }}</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p class="text-center"><strong>Új (táblázatban lévő)</strong></p>
+                                        <p>{{ x[2]['date'] }}, {{ x[2]['from'] }} > {{ x[2]['to'] }}<br/><br/>{{ x[2]['location'] }}<br/>{{ x[2]['course_code'] }}<br/>{{ x[2]['course_name'] }}<br/>{{ x[2]['subj_code'] }}<br/>{{ x[2]['groups'] }}</p>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                {% endif %}
+            </div>
+        </main>
+        <br/>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
+    </body>
+</html> 
