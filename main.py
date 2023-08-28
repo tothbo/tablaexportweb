@@ -77,6 +77,20 @@ class KartyAdatok():
                     frow = False
                 elif(type(cell.value) == None or cell.value == None):
                     interlist.append("ismeretlen")
+                elif(cell.value == "Monday"):
+                    interlist.append("hétfő")
+                elif(cell.value == "Tuesday"):
+                    interlist.append("kedd")
+                elif(cell.value == "Wednesday"):
+                    interlist.append("szerda")
+                elif(cell.value == "Thursday"):
+                    interlist.append("csütörtök")
+                elif(cell.value == "Friday"):
+                    interlist.append("péntek")
+                elif(cell.value == "Saturday"):
+                    interlist.append("szombat")
+                elif(cell.value == "Sunday"):
+                    interlist.append("vasárnap")
                 else:
                     interlist.append(cell.value)
 
@@ -279,6 +293,68 @@ def calcDiff(db:KartyAdatok, username:str) -> list:
     
 ## itt számoljuk ki a hasznos dátumokat > azokat amiket meg is fogunk jeleníteni a dropdownban
 
+def calcHasznosHetek():
+    WB = openpyxl.load_workbook("dl.xlsx", True)
+    WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+    hasznosHetek = []
+    dates = []
+    naps = []
+
+    try:
+        SH = WB["2023tavasz"]
+        SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
+    except Exception as e:
+        return ["2000-01-01"]
+    
+    for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
+        if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+            continue
+        if row[0].value not in dates:
+            dates.append(row[0].value)
+            if(row[1].value == "Monday"):
+                naps.append("hétfő")
+            elif(row[1].value == "Tuesday"):
+                naps.append("kedd")
+            elif(row[1].value == "Wednesday"):
+                naps.append("szerda")
+            elif(row[1].value == "Thursday"):
+                naps.append("csütörtök")
+            elif(row[1].value == "Friday"):
+                naps.append("péntek")
+            elif(row[1].value == "Saturday"):
+                naps.append("szombat")
+            elif(row[1].value == "Sunday"):
+                naps.append("vasárnap")
+            else:
+                naps.append(row[1].value)
+
+    for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+        if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+            continue
+        if row[0].value not in dates:
+            dates.append(row[0].value)
+            if(row[1].value == "Monday"):
+                naps.append("hétfő")
+            elif(row[1].value == "Tuesday"):
+                naps.append("kedd")
+            elif(row[1].value == "Wednesday"):
+                naps.append("szerda")
+            elif(row[1].value == "Thursday"):
+                naps.append("csütörtök")
+            elif(row[1].value == "Friday"):
+                naps.append("péntek")
+            elif(row[1].value == "Saturday"):
+                naps.append("szombat")
+            elif(row[1].value == "Sunday"):
+                naps.append("vasárnap")
+            else:
+                naps.append(row[1].value)
+
+    for x in range(0,len(dates)):
+        hasznosDatumok.append(str(dates[x])[:10])
+
+    return (hasznosDatumok,naps)
+
 def calcHasznosDatumok():
     WB = openpyxl.load_workbook("dl.xlsx", True)
     WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
@@ -472,6 +548,10 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
 
 @app.route('/', methods = ['GET', 'POST'])
 def index(name="Index", usname=""):
+    view = session.get('view')
+    print(session.get('view'))
+    if view is None:
+        session['view'] = 'list'
     if(request.method == "POST" and request.form['username'] in ["alma", "naptr1bPdl"]):
         session['username'] = request.form['username']
         try:
@@ -519,7 +599,8 @@ def index(name="Index", usname=""):
                     filterkurz=nullstr(search_kurzuskod),
                     lasthit=lastHit(),
                     startpg=True,
-                    elerhetoKartyaIdk = selectdb.felsorolo()
+                    elerhetoKartyaIdk = selectdb.felsorolo(),
+                    view=session['view']
                 )
             filterdb = calcFilter(db.data, interHasznDatumok, search_date, search_targykod, search_targynev, search_kurzuskod)
             return render_template(
@@ -537,7 +618,8 @@ def index(name="Index", usname=""):
                 filterkurz=nullstr(search_kurzuskod),
                 lasthit=lastHit(),
                 startpg=False,
-                elerhetoKartyaIdk = filterdb.felsorolo()
+                elerhetoKartyaIdk = filterdb.felsorolo(),
+                view=session['view']
             )
         except Exception as e:
             print("Tried to filter at sz4, but "+str(e))
@@ -557,7 +639,8 @@ def index(name="Index", usname=""):
             filterkurz=nullstr(""),
             lasthit=lastHit(),
             startpg = True,
-            elerhetoKartyaIdk = 'null'
+            elerhetoKartyaIdk = 'null',
+            view=session['view']
         )
     return render_template(
         'index.html',
@@ -574,8 +657,23 @@ def index(name="Index", usname=""):
         filterkurz=nullstr(""),
         lasthit=lastHit(),
         startpg = True,
-        elerhetoKartyaIdk = 'null'
+        elerhetoKartyaIdk = 'null',
+        view=session['view']
     )
+
+## nézetek
+@app.route('/view')
+def change_view():
+    try:
+        if(request.args['origin'] == 'minical'):
+            session['view'] = 'list'
+        elif(request.args['origin'] == 'list'):
+            session['view'] = 'minical'
+        else:
+            session['view'] = 'list'
+        return redirect(url_for('index'))
+    except Exception as e:
+        return str(e)
 
 ## fájlok
 @app.route('/cals/<path:path>')

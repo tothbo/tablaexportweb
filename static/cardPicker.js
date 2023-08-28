@@ -107,3 +107,7 @@ function pickThis(cardID, load){
         document.getElementById('valasztottakDarab').innerText = 'Kiválasztva: '+(document.getElementById('valasztottak1').value.split(';').length - 1)+' darab kártya';
     }
 }
+
+function changeView(origin){
+    window.location.replace('/view?origin='+origin);
+}

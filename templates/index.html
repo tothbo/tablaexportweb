@@ -7,7 +7,8 @@
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{{ name }} > Tábla Export</title>
-        <link rel="manifest" href="/static/manifest.json">
+        <link rel="manifest" href="/static/manifest.json" />
+        <link rel="stylesheet" href="/static/styles.css" />
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
         <style>
             @keyframes slideInFromBottom {
@@ -38,8 +39,8 @@
                             <input type="submit" value="Belépek!" class="btn btn-primary" style="margin-top:1rem;" />
                         </form>
                     </div>
-                {% else %}
-                    <h1 class="text-left" style="size:1rem;" id="banner">Naptárnézet: {{ usname }}</h1>
+                {% elif view == "list"  %}
+                <h1 class="text-left" style="size:1rem;" id="banner">Naptárnézet > {{ usname }}</h1>
                     <div class="col-md-3" id="szurokSlide">
                         <h2 class="text-center" style="size:0.7rem;">Szűrés:</h2>
                         <form method="POST" action="">
@@ -96,12 +97,18 @@
                                 </div>
                             </div>
                         </form>
-                        <form method="POST" action="/diff" class="row" style="margin-top:1rem;">
-                            <div class="col">
-                                <input type="hidden" name="username" value="{{ usname }}" />
-                                <input type="submit" class="btn btn-outline-primary" value="Változás-ellenőrzés" />
+                        <div class="row">
+                            <div class="col-6">
+                                <button type="button" class="btn btn-outline-info" style="margin-top:1rem;" onclick="changeView('list')">
+                                    Mininaptár-nézet
+                                </button>
                             </div>
-                        </form>
+                            <div class="col-6">
+                                <a type="button" class="btn btn-outline-primary" href="/diff" style="margin-top:1rem;">
+                                    Változások (béta)
+                                </a>
+                            </div>
+                        </div>
                         <br/>
                         <small>Adatbázis lekérve: {{ lasthit }}</small>
                     </div>
@@ -110,7 +117,7 @@
                         <div class="row {% if kartyahossz > 0 %} row-cols-2 row-cols-md-4 g-4 {% endif %} ">
                             {% if startpg == True %}
                                 {% if kartyahossz == 0 %}
-                                    <h2>Üdv újra a Tábla Exportban!</h2><p>Rég láttalak itt! Mielőtt nekiállsz újra összepakolni mindent, érdemes összehasonlítani az előző verzió naptárát a jelenlegi táblázattal. ;-)</p>
+                                    <h2>Köszöntelek!</h2><p>Az új táblázat még nem került feltöltésre, addig is a régi (2022-2023/2) adatokat tudod böngészni</p>
                                 {% else %}
                                     {% for sor in kartyadatok %}
                                         <div class="col">
@@ -156,6 +163,109 @@
                             {% endif %}
                         </div>
                     </div>
+                {% elif view == "minical" %}
+                    <h1 class="text-left" style="size:1rem;" id="banner">Naptárnézet > {{ usname }}</h1>
+                    <div class="col-md-1" id="szurokSlide">
+                        <h2 class="text-center" style="size:0.7rem;">Szűrés:</h2>
+                        <form method="POST" action="">
+                            <label for="sz1" class="form-label">Hét:</label>
+                            <select name="sz1" class="form-select form-select-lg" aria-label=".form-select-lg sz1">
+                                <option value="null">- Üres (minden hét) -</option>
+                                {% for x in range(0, hasznosDatHossz) %}
+                                    {% if x == filterdate %}
+                                        <option value="{{ x }}" selected>{{ hasznosDatumok[x] }} ({{ hasznosNapok[x] }})</option>
+                                    {% else %}
+                                        <option value="{{ x }}">{{ hasznosDatumok[x] }} ({{ hasznosNapok[x] }})</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <br/>
+                            <label for="sz2" class="form-label">Tárgykód:</label>
+                            <input type="text" class="form-control form-control-lg" name="sz2" aria-label=".form-control-lg sz2" placeholder="IP-18a...." value="{{ filterkod }}" />
+                            <small id="sz2" class="form-text text-muted">Nem case-sensitive (mindegy hogy nagy vagy kis betűk vannak benne)</small>
+                            <br/><br/>
+                            <label for="sz3" class="form-label">Tárgynév:</label>
+                            <input type="text" class="form-control form-control-lg" name="sz3" aria-label=".form-control-lg sz3" placeholder="Atomcsill...." value="{{ filternev }}" />
+                            <small id="sz3" class="form-text text-muted">Ez sem case-sensitive</small>
+                            <br/><br/>
+                            <label for="sz4" class="form-label">Kurzuskód:</label>
+                            <input type="text" class="form-control form-control-lg" name="sz4" aria-label=".form-control-lg sz4" placeholder="GTKABC...." value="{{ filterkurz }}" />
+                            <small id="sz4" class="form-text text-muted">Egyik sem case sensitive :D</small>
+                            <br/><br/>
+                            <input type="hidden" name="username" value="{{ usname }}" />
+                            <input type="hidden" name="validk" id="valasztottak2" value=""/>
+                            <div class="row">
+                                <div class="col-12">
+                                    <input type="submit" class="btn btn-outline-info" value="Alkalmaz" />
+                                </div>
+                                <div class="col-12 mt-3">
+                                    <input id="selall" type="reset" class="btn btn-outline-primary" onclick="selectAll()" value="Mindent választ"></input>
+                                </div>
+                                <small id="selall" class="form-text text-muted">A mindent választ opció csak az órákat választja ki, a vizsgákat nem válogatja bele (azokat külön tudod választani, melyik kell).</small>
+                            </div>
+                        </form>
+                        <form method="POST" action="/savecal" style="margin-top:1rem;">
+                            <input type="hidden" name="usnamepost" value="{{ usname }}" />
+                            <label for="valasztottak" id="valasztottakDarab" class="form-label">Kiválasztva: 0 db kártya</label>
+                            <div class="alert alert-warning d-none" role="alert" id="alertBox">
+                                null
+                            </div>
+                            <input type="hidden" name="valasztottak" id="valasztottak1" value=""/>
+                            <input type="hidden" name="elerheto" id="elerheto" value="{{ elerhetoKartyaIdk }}"/>
+                            <div class="row">
+                                <div class="col-12">
+                                    <input type="submit" class="btn btn-success" value="Mentés" />
+                                </div>
+                                <div class="col-12 mt-3">
+                                    <input type="reset" class="btn btn-warning" value="Alaphelyzet" onclick="clearSelections()" />
+                                </div>
+                            </div>
+                        </form>
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="button" class="btn btn-outline-info" style="margin-top:1rem;" onclick="changeView('minical')">
+                                    Listanézet
+                                </button>
+                            </div>
+                            <div class="col-12 mt-3">
+                                <a type="button" class="btn btn-outline-primary" href="/diff">
+                                    Változások (β)
+                                </a>
+                            </div>
+                        </div>
+                        <br/>
+                        <small>Adatbázis lekérve: {{ lasthit }}</small>
+                    </div>
+                    <div id="loader" class="col-md-9 text-center align-content-center"><img src="/static/grid.svg" alt="Töltök..." style="margin-top:2rem;"/></div>
+                    <div class="col-md-11 d-none" style="padding-top:1rem;display:none" id="underLoader">                        
+                        <div class="row seven-cols">
+                            {% if filterkod != '' or filterkurz != '' or filternev != '' %}
+                                    {% for sor in kartyadatok %}
+                                        <div class="col-md-1">
+                                            <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-secondary {% endif %}" id="card{{ sor[-1] }}">
+                                                <div class="card-header text-left">
+                                                    {% if 'Típus:' in sor[6] %} 🎓 {% endif %}<strong>{{ sor[0] }} - {{ sor[2] }}</strong> <br/> [{{ sor[7] }}]
+                                                </div>
+                                                <div class="card-body">
+                                                    <p class="card-text"><strong>{{ sor[3] }}</strong><br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
+                                                    {% if sor[0] != 'ismeretlen' and sor[2] != 'ismeretlen' %}
+                                                    <button onclick="pickThis('{{ sor[-1] }}', false)" id="picker{{ sor[-1] }}" class="btn btn-outline-primary">Választ</button>
+                                                    {% else %}
+                                                    <button id="picker{{ sor[-1] }}" class="btn btn-dark">Nem választhatod ki</button>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                            {% elif filterkod == '' and filterkurz == '' and filternev == '' %}
+                                <p style="font-size:2rem;">(a naptárnézet csak akkor működik, ha valamelyik szűrőt [kivétel a dátumot] bekapcsoltad)</p>
+                            {% else %}
+                                <p style="font-size:2rem;">Üres :/</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <h1 class="text-left" style="size:1rem;" id="banner">Ismeretlen nézet</h1>
                 {% endif %}
             </div>
         </main>
@@ -183,6 +293,28 @@
                     </div>
                 </div>
             </div>
+            <!--<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h1 class="modal-title fs-5" id="settingsModalLabel">Értesítések beállítása > {{ usname }}</h1>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="container-fluid">
+                            <div class="row">
+                                <div class="col-6"><p>E-mail értesítések küldése</p></div>
+                                <div class="col-6 text-end"><button class="btn btn-secondary">Hamarosan...</button></div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-6"><p>E-mail cím:</p></div>
+                                <div class="col-6"><input type="email" class="form-control" placeholder="{{ usname }}@example.com" required></input></div>
+                            </div>
+                        </div>
+                    </div>
+                  </div>
+                </div>
+            </div>-->
         <script type="text/javascript" src="/static/cardPicker.js"></script>
         {% endif %}
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
