@@ -238,17 +238,18 @@
                     </div>
                     <div id="loader" class="col-md-9 text-center align-content-center"><img src="/static/grid.svg" alt="Töltök..." style="margin-top:2rem;"/></div>
                     <div class="col-md-11 d-none" style="padding-top:1rem;display:none" id="underLoader">                        
-                        <div class="row seven-cols">
-                            {% if filterdate != '' %}
-                                    {% for adottNap in kartyadatok %}
+                        <div class="row six-cols">
+                            {% if startpg != true and kartyahossz > 0 %}
+                                    {% for adottNapId in range(0, osszhossz) %}
                                         <div class="col-md-1">
-                                            {% for sor in adottNap.data %}
-                                                <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-secondary {% endif %}" id="card{{ sor[-1] }}">
+                                            <p class="fs-3 text-center">{{ hasznosHetekNapjai[adottNapId] }}</p>
+                                            {% for sor in kartyadatok[adottNapId].data %}
+                                                <div class="card mt-3 {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-secondary {% endif %}" id="card{{ sor[-1] }}">
                                                     <div class="card-header text-left">
                                                         {% if 'Típus:' in sor[6] %} 🎓 {% endif %}<strong>{{ sor[0] }} - {{ sor[2] }}</strong> <br/> [{{ sor[7] }}]
                                                     </div>
                                                     <div class="card-body">
-                                                        <p class="card-text"><strong>{{ sor[3] }}</strong><br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
+                                                        <p class="card-text onerow"><strong>{{ sor[3] }}</strong><br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
                                                         {% if sor[0] != 'ismeretlen' and sor[2] != 'ismeretlen' %}
                                                         <button onclick="pickThis('{{ sor[-1] }}', false)" id="picker{{ sor[-1] }}" class="btn btn-outline-primary">Választ</button>
                                                         {% else %}
@@ -259,8 +260,10 @@
                                             {% endfor %}
                                         </div>
                                     {% endfor %}
-                            {% elif filterkod == '' and filterkurz == '' and filternev == '' %}
-                                <p style="font-size:2rem;">(a naptárnézet csak akkor működik, ha legalább az egyik szűrőt bekapcsoltad)</p>
+                            {% elif filterhet == 'ismeretlen' %}
+                                <p style="font-size:2rem;">(a naptárnézet csak akkor működik, ha legalább a hétre rászűrtél)</p>
+                            {% elif kartyahossz == 0 %}
+                                <p style="font-size:2rem;">(nincsenek kiválasztott kártyáid, használd a további szűrőket)</p>
                             {% else %}
                                 <p style="font-size:2rem;">Üres :/</p>
                             {% endif %}
