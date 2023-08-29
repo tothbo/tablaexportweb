@@ -4,9 +4,11 @@ from pathlib import Path
 from office365.runtime.auth.authentication_context import AuthenticationContext
 from office365.sharepoint.client_context import ClientContext
 import datetime as datetime
-import pytz, openpyxl, os, sys, json
+import pytz, openpyxl, os, sys, json, traceback
 
 os.environ['TZ'] = 'Europe/Budapest'
+
+ALLOWED_USR = ['alma', 'teszt']
 
 config = ""
 expversion = '1'
@@ -141,6 +143,19 @@ def calcMax(databs) -> KartyAdatok:
     outdb.data = databs.data[slice(100)]
     return outdb
 
+### def calcWeeklyBreakdown(databs, week, filterRowId='null'):
+###    outdb = []
+###    if(filterRowId == 'null'):
+###        raise Exception('Filter ID sor null értéket adott, ami nem lehetséges.')
+###    elif(filterRowId == '' or filterRowId == ' ' or filterRowId == ';'):
+###        return outdb
+###    for rid in filterRowId.split(';'):
+###        if(rid == '' or rid == ' '):
+###            continue
+###        for x in databs.data:
+###            if x[-1] == int(rid):
+###      
+          
 def calcFilterID(databs, hasznosDatumok, filterRowId='null'):
     outdb = KartyAdatok()
     if(filterRowId == 'null'):
@@ -155,6 +170,29 @@ def calcFilterID(databs, hasznosDatumok, filterRowId='null'):
                 outdb.addRow(x)
                 break
     return outdb
+
+def calcFilterWeeks(databs, hasznosHetek, filterWeekId='null', filterTargykod='null', filterTargynev='null', filterKurz='null') -> KartyAdatok:
+    outdb = [KartyAdatok(),KartyAdatok(),KartyAdatok(),KartyAdatok(),KartyAdatok(),KartyAdatok(),KartyAdatok()]
+    if(filterWeekId == 'null'):
+        return []
+    for row in databs:
+        should = True
+        if(row[0] == 'ismeretlen'):
+            continue
+        if(datetime.datetime.strptime(row[0], "%Y-%m-%d").isocalendar()[1] != hasznosHetek[int(filterWeekId)]):
+            should = False
+        if(filterTargykod != 'null' and should == True):
+            if(filterTargykod.lower() not in row[4].lower()):
+                should = False
+        if(filterTargynev != 'null' and should == True):
+            if(filterTargynev.lower() not in row[3].lower()):
+                should = False
+        if(filterKurz != 'null' and should == True):
+            if(filterKurz.lower() not in row[5].lower()):
+                should = False
+        if(should):
+            outdb[hasznosHetek[int(filterWeekId)]].addRow(row)
+    return outdb   
 
 def calcFilter(databs, hasznosDatumok, filterDateId='null', filterTargykod='null', filterTargynev='null', filterKurz='null') -> KartyAdatok:
     outdb = KartyAdatok()
@@ -297,8 +335,8 @@ def calcHasznosHetek():
     WB = openpyxl.load_workbook("dl.xlsx", True)
     WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
     hasznosHetek = []
-    dates = []
-    naps = []
+    weekNums = []
+    startDate = []
 
     try:
         SH = WB["2023tavasz"]
@@ -309,51 +347,21 @@ def calcHasznosHetek():
     for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
         if(row[0].value == None or row[0].value == "" or row[0].value == " "):
             continue
-        if row[0].value not in dates:
-            dates.append(row[0].value)
-            if(row[1].value == "Monday"):
-                naps.append("hétfő")
-            elif(row[1].value == "Tuesday"):
-                naps.append("kedd")
-            elif(row[1].value == "Wednesday"):
-                naps.append("szerda")
-            elif(row[1].value == "Thursday"):
-                naps.append("csütörtök")
-            elif(row[1].value == "Friday"):
-                naps.append("péntek")
-            elif(row[1].value == "Saturday"):
-                naps.append("szombat")
-            elif(row[1].value == "Sunday"):
-                naps.append("vasárnap")
-            else:
-                naps.append(row[1].value)
+        if row[0].value.isocalendar()[1] not in weekNums:
+            weekNums.append(row[0].value.isocalendar()[1])
+            startDate.append(row[0].value)
 
     for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
         if(row[0].value == None or row[0].value == "" or row[0].value == " "):
             continue
-        if row[0].value not in dates:
-            dates.append(row[0].value)
-            if(row[1].value == "Monday"):
-                naps.append("hétfő")
-            elif(row[1].value == "Tuesday"):
-                naps.append("kedd")
-            elif(row[1].value == "Wednesday"):
-                naps.append("szerda")
-            elif(row[1].value == "Thursday"):
-                naps.append("csütörtök")
-            elif(row[1].value == "Friday"):
-                naps.append("péntek")
-            elif(row[1].value == "Saturday"):
-                naps.append("szombat")
-            elif(row[1].value == "Sunday"):
-                naps.append("vasárnap")
-            else:
-                naps.append(row[1].value)
+        if row[0].value.isocalendar()[1] not in weekNums:
+            weekNums.append(row[0].value.isocalendar()[1])
+            startDate.append(row[0].value)
 
-    for x in range(0,len(dates)):
-        hasznosDatumok.append(str(dates[x])[:10])
+    for x in range(0,len(weekNums)):
+        hasznosHetek.append(str(weekNums[x]))
 
-    return (hasznosDatumok,naps)
+    return (hasznosHetek, startDate)
 
 def calcHasznosDatumok():
     WB = openpyxl.load_workbook("dl.xlsx", True)
@@ -418,7 +426,7 @@ def calcHasznosDatumok():
     return (hasznosDatumok,naps)
 
 app = Flask(__name__)
-app.secret_key = os.urandom(256)
+app.secret_key = "REALLY_SECRET"
 
 db = KartyAdatok()
     
@@ -428,6 +436,15 @@ db.recalculate()
 interHasznDatumok=calcHasznosDatumok()
 interHasznNapok=interHasznDatumok[1]
 interHasznDatumok=interHasznDatumok[0]
+
+interHasznHetek=calcHasznosHetek()
+interHasznHetKezdo=interHasznHetek[1]
+interHasznHetek=interHasznHetek[0]
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
+    app.permanent_session_lifetime = datetime.timedelta(minutes=15)
 
 @app.route('/refresh')
 def refresh(name="Frissítés"):
@@ -548,12 +565,30 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
 
 @app.route('/', methods = ['GET', 'POST'])
 def index(name="Index", usname=""):
+    print(session)
     view = session.get('view')
-    print(session.get('view'))
+    username = session.get('username')
+    isUser = None
+
+    if(request.method == "POST"):
+        try:
+            isUser = request.form['username'] 
+            print('new user:'+request.form['username'])
+        except Exception as e:
+            print("Tried to get username, but "+str(e))
+            isUser = None
+
     if view is None:
         session['view'] = 'list'
-    if(request.method == "POST" and request.form['username'] in ["alma", "naptr1bPdl"]):
-        session['username'] = request.form['username']
+
+    if isUser is not None:
+        session['username'] = request.form['username'] 
+    elif username == None:
+        session['username'] = 'unknown'
+
+    if(session['username'] in ALLOWED_USR):
+        print('viewer: '+session['view'])
+
         try:
             search_date = request.form['sz1']
         except Exception as e:
@@ -574,8 +609,15 @@ def index(name="Index", usname=""):
             search_kurzuskod = request.form['sz4']
             if(search_kurzuskod == '' or search_kurzuskod == ' '):
                 search_kurzuskod = 'null'
+        except Exception as e:
+            print("Tried to filter at sz4, but "+str(e))
+
+        ## after reading through all the filters:
+
+        try:
+            ## ha mindenunk null > ki kell irni a mar kivalasztott itemeket
             if(search_targynev == 'null' and search_targykod == 'null' and search_date == 'null' and search_kurzuskod == 'null'):
-                try:
+                try: 
                     validk = request.form['validk']
                 except Exception as e:
                     print("Tried to get the validk, but it threw an Exception: "+str(e))
@@ -591,6 +633,9 @@ def index(name="Index", usname=""):
                     hasznosDatumok=interHasznDatumok,
                     hasznosNapok=interHasznNapok,
                     hasznosDatHossz=len(interHasznDatumok),
+                    hasznosHetek=interHasznHetek,
+                    hasznosHetekHossz=len(interHasznHetek),
+                    hasznosHetekKezdo=interHasznHetKezdo,
                     kartyadatok=selectdb.data, 
                     kartyahossz=selectdb.getLength(),
                     filterdate=nullint(search_date),
@@ -602,28 +647,57 @@ def index(name="Index", usname=""):
                     elerhetoKartyaIdk = selectdb.felsorolo(),
                     view=session['view']
                 )
-            filterdb = calcFilter(db.data, interHasznDatumok, search_date, search_targykod, search_targynev, search_kurzuskod)
-            return render_template(
-                'index.html',
-                name=name,
-                usname=session["username"],
-                hasznosDatumok=interHasznDatumok,
-                hasznosNapok=interHasznNapok,
-                hasznosDatHossz=len(interHasznDatumok),
-                kartyadatok=filterdb.data, 
-                kartyahossz=filterdb.getLength(),
-                filterdate=nullint(search_date),
-                filterkod=nullstr(search_targykod),
-                filternev=nullstr(search_targynev),
-                filterkurz=nullstr(search_kurzuskod),
-                lasthit=lastHit(),
-                startpg=False,
-                elerhetoKartyaIdk = filterdb.felsorolo(),
-                view=session['view']
-            )
+            if(session['view'] == 'list'):
+                filterdb = calcFilter(db.data, interHasznDatumok, search_date, search_targykod, search_targynev, search_kurzuskod)
+                return render_template(
+                    'index.html',
+                    name=name,
+                    usname=session["username"],
+                    hasznosDatumok=interHasznDatumok,
+                    hasznosNapok=interHasznNapok,
+                    hasznosDatHossz=len(interHasznDatumok),
+                    hasznosHetek=interHasznHetek,
+                    hasznosHetekHossz=len(interHasznHetek),
+                    hasznosHetekKezdo=interHasznHetKezdo,
+                    kartyadatok=filterdb.data, 
+                    kartyahossz=filterdb.getLength(),
+                    filterdate=nullint(search_date),
+                    filterkod=nullstr(search_targykod),
+                    filternev=nullstr(search_targynev),
+                    filterkurz=nullstr(search_kurzuskod),
+                    lasthit=lastHit(),
+                    startpg=False,
+                    elerhetoKartyaIdk = filterdb.felsorolo(),
+                    view=session['view']
+                )
+            else:
+                filterdb = calcFilterWeeks(db.data, interHasznHetek, search_date, search_targykod, search_targynev, search_kurzuskod)
+                for x in range(0,7):
+                    print(filterdb[x].data)
+                return render_template(
+                    'index.html',
+                    name=name,
+                    usname=session["username"],
+                    hasznosDatumok=interHasznDatumok,
+                    hasznosNapok=interHasznNapok,
+                    hasznosDatHossz=len(interHasznDatumok),
+                    hasznosHetek=interHasznHetek,
+                    hasznosHetekHossz=len(interHasznHetek),
+                    hasznosHetekKezdo=interHasznHetKezdo,
+                    kartyadatok=filterdb, 
+                    kartyahossz=filterdb[0].getLength()+filterdb[1].getLength()+filterdb[2].getLength()+filterdb[3].getLength()+filterdb[4].getLength()+filterdb[5].getLength()+filterdb[6].getLength(),
+                    filterdate=nullint(search_date),
+                    filterkod=nullstr(search_targykod),
+                    filternev=nullstr(search_targynev),
+                    filterkurz=nullstr(search_kurzuskod),
+                    lasthit=lastHit(),
+                    startpg=False,
+                    elerhetoKartyaIdk = filterdb[0].felsorolo()+filterdb[1].felsorolo()+filterdb[2].felsorolo()+filterdb[3].felsorolo()+filterdb[4].felsorolo()+filterdb[5].felsorolo()+filterdb[6].felsorolo(),
+                    view=session['view']
+                )
         except Exception as e:
-            print("Tried to filter at sz4, but "+str(e))
-    if "username" in session:
+            print("Tried to show the filtered stuff, but "+str(e))
+            print(traceback.format_exc())
         return render_template(
             'index.html',
             name=name,
@@ -631,17 +705,21 @@ def index(name="Index", usname=""):
             hasznosDatumok=interHasznDatumok,
             hasznosNapok=interHasznNapok,
             hasznosDatHossz=len(interHasznDatumok),
-            kartyadatok=calcMax(db).data,
+            hasznosHetek=interHasznHetek,
+            hasznosHetekHossz=len(interHasznHetek),
+            hasznosHetekKezdo=interHasznHetKezdo,
+            kartyadatok=calcMax(db).data, 
             kartyahossz=0,
-            filterdate=nullint(""),
-            filterkod=nullstr(""),
-            filternev=nullstr(""),
-            filterkurz=nullstr(""),
+            filterdate=nullint(0),
+            filterkod=nullstr(''),
+            filternev=nullstr(''),
+            filterkurz=nullstr(''),
             lasthit=lastHit(),
-            startpg = True,
-            elerhetoKartyaIdk = 'null',
+            startpg=True,
+            elerhetoKartyaIdk = 0,
             view=session['view']
         )
+    session['view'] = 'list'
     return render_template(
         'index.html',
         name=name,

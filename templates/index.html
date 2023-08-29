@@ -40,7 +40,7 @@
                         </form>
                     </div>
                 {% elif view == "list"  %}
-                <h1 class="text-left" style="size:1rem;" id="banner">Naptárnézet > {{ usname }}</h1>
+                <h1 class="text-left" style="size:1rem;" id="banner">Listanézet > {{ usname }}</h1>
                     <div class="col-md-3" id="szurokSlide">
                         <h2 class="text-center" style="size:0.7rem;">Szűrés:</h2>
                         <form method="POST" action="">
@@ -171,11 +171,11 @@
                             <label for="sz1" class="form-label">Hét:</label>
                             <select name="sz1" class="form-select form-select-lg" aria-label=".form-select-lg sz1">
                                 <option value="null">- Üres (minden hét) -</option>
-                                {% for x in range(0, hasznosDatHossz) %}
-                                    {% if x == filterdate %}
-                                        <option value="{{ x }}" selected>{{ hasznosDatumok[x] }} ({{ hasznosNapok[x] }})</option>
+                                {% for x in range(0, hasznosHetekHossz) %}
+                                    {% if x == filterhet %}
+                                        <option value="{{ x }}" selected>{{ hasznosHetek[x] }}. hét ({{ hasznosHetekKezdo[x] }})</option>
                                     {% else %}
-                                        <option value="{{ x }}">{{ hasznosDatumok[x] }} ({{ hasznosNapok[x] }})</option>
+                                        <option value="{{ x }}">{{ hasznosHetek[x] }}. hét ({{ hasznosHetekKezdo[x] }})</option>
                                     {% endif %}
                                 {% endfor %}
                             </select>
@@ -239,26 +239,28 @@
                     <div id="loader" class="col-md-9 text-center align-content-center"><img src="/static/grid.svg" alt="Töltök..." style="margin-top:2rem;"/></div>
                     <div class="col-md-11 d-none" style="padding-top:1rem;display:none" id="underLoader">                        
                         <div class="row seven-cols">
-                            {% if filterkod != '' or filterkurz != '' or filternev != '' %}
-                                    {% for sor in kartyadatok %}
+                            {% if filterdate != '' %}
+                                    {% for adottNap in kartyadatok %}
                                         <div class="col-md-1">
-                                            <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-secondary {% endif %}" id="card{{ sor[-1] }}">
-                                                <div class="card-header text-left">
-                                                    {% if 'Típus:' in sor[6] %} 🎓 {% endif %}<strong>{{ sor[0] }} - {{ sor[2] }}</strong> <br/> [{{ sor[7] }}]
+                                            {% for sor in adottNap.data %}
+                                                <div class="card {% if sor[0] == 'ismeretlen' or sor[2] == 'ismeretlen' %} text-bg-secondary {% endif %}" id="card{{ sor[-1] }}">
+                                                    <div class="card-header text-left">
+                                                        {% if 'Típus:' in sor[6] %} 🎓 {% endif %}<strong>{{ sor[0] }} - {{ sor[2] }}</strong> <br/> [{{ sor[7] }}]
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <p class="card-text"><strong>{{ sor[3] }}</strong><br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
+                                                        {% if sor[0] != 'ismeretlen' and sor[2] != 'ismeretlen' %}
+                                                        <button onclick="pickThis('{{ sor[-1] }}', false)" id="picker{{ sor[-1] }}" class="btn btn-outline-primary">Választ</button>
+                                                        {% else %}
+                                                        <button id="picker{{ sor[-1] }}" class="btn btn-dark">Nem választhatod ki</button>
+                                                        {% endif %}
+                                                    </div>
                                                 </div>
-                                                <div class="card-body">
-                                                    <p class="card-text"><strong>{{ sor[3] }}</strong><br/>{{ sor[4] }}<br/>{{ sor[5] }}<br/>{{ sor[6] }}</p>
-                                                    {% if sor[0] != 'ismeretlen' and sor[2] != 'ismeretlen' %}
-                                                    <button onclick="pickThis('{{ sor[-1] }}', false)" id="picker{{ sor[-1] }}" class="btn btn-outline-primary">Választ</button>
-                                                    {% else %}
-                                                    <button id="picker{{ sor[-1] }}" class="btn btn-dark">Nem választhatod ki</button>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
+                                            {% endfor %}
                                         </div>
                                     {% endfor %}
                             {% elif filterkod == '' and filterkurz == '' and filternev == '' %}
-                                <p style="font-size:2rem;">(a naptárnézet csak akkor működik, ha valamelyik szűrőt [kivétel a dátumot] bekapcsoltad)</p>
+                                <p style="font-size:2rem;">(a naptárnézet csak akkor működik, ha legalább az egyik szűrőt bekapcsoltad)</p>
                             {% else %}
                                 <p style="font-size:2rem;">Üres :/</p>
                             {% endif %}
