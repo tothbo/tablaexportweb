@@ -9,7 +9,7 @@
         <title>{{ name }} > Tábla Export</title>
         <link rel="manifest" href="/static/manifest.json" />
         <link rel="stylesheet" href="/static/styles.css" />
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+        <link href="/static/bootstrap.min.css" rel="stylesheet" />
         <style>
             @keyframes slideInFromBottom {
                 0% {
@@ -117,7 +117,7 @@
                         <div class="row {% if kartyahossz > 0 %} row-cols-2 row-cols-md-4 g-4 {% endif %} ">
                             {% if startpg == True %}
                                 {% if kartyahossz == 0 %}
-                                    <h2>Köszöntelek!</h2><p>Az új táblázat még nem került feltöltésre, addig is a régi (2022-2023/2) adatokat tudod böngészni</p>
+                                    <h2>Köszöntelek!</h2><p>Mostmár a 2023-2024/1es adatokkal! Ugyan a vizsgatáblázat még hiányzik, de az órarendi adatok már elérhetőek. Frissen ropogósan az igazi :D</p>
                                 {% else %}
                                     {% for sor in kartyadatok %}
                                         <div class="col">
@@ -261,11 +261,11 @@
                                         </div>
                                     {% endfor %}
                             {% elif filterhet == 'ismeretlen' %}
-                                <p style="font-size:2rem;">(a naptárnézet csak akkor működik, ha legalább a hétre rászűrtél)</p>
+                                <p style="font-size:1.5rem;">(a naptárnézet használatához válaszd ki, melyik hetet szeretnéd látni)</p>
                             {% elif kartyahossz == 0 %}
-                                <p style="font-size:2rem;">(nincsenek kiválasztott kártyáid, használd a további szűrőket)</p>
+                                <p style="font-size:1.5rem;">(nem szűrtél rá semmire)</p>
                             {% else %}
-                                <p style="font-size:2rem;">Üres :/</p>
+                                <p style="font-size:1.5rem;">Üres :/</p>
                             {% endif %}
                         </div>
                     </div>
@@ -284,15 +284,17 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            <p><strong>Hotfix</strong><br/><i>(a jobb felső sarokban lévő X-el tudod bezárni ezt az ablakot)</i><br/>
+                            <p><strong>2023 nyári frissítés</strong><br/><i>(a jobb felső sarokban lévő X-el tudod bezárni ezt az ablakot)</i><br/>
                                 <ul>
                                     <li>
-                                        A bejövő táblázat tartalmaz hibás sorokat, ezek utójavítása megtörtént.
+                                        Összehasonlítás funkció továbbfejlesztése. (még minbdíg maradt bétában instabilitása miatt)
                                     </li><li>
-                                        Összehasonlítás funkció javítva.
+                                        Miniaptár funkció, naptár-szerű elrendezés, heti nézettel a könnyebb áttkeinthetőség érdekében.
+                                    </li><li>
+                                        2023-2024/őszi félév adatbázisa
                                     </li>
                                 </ul>
-                                Szép napot mindenkinek :3
+                                >:=:<
                             </p>
                         </div>
                     </div>
@@ -322,6 +324,6 @@
             </div>-->
         <script type="text/javascript" src="/static/cardPicker.js"></script>
         {% endif %}
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script>
+        <script src="/static/bootstrap.bundle.min.js"></script>
     </body>
 </html> 

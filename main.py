@@ -1,14 +1,16 @@
-from flask import Flask, render_template, session, request, redirect, url_for, send_file, send_from_directory
+from flask import Flask, render_template, session, request, redirect, url_for, send_file, send_from_directory, make_response
 from icalendar import Calendar, Event, vCalAddress, vText
 from pathlib import Path
 from office365.runtime.auth.authentication_context import AuthenticationContext
 from office365.sharepoint.client_context import ClientContext
+from itsdangerous import URLSafeSerializer
+from operator import itemgetter as iget
 import datetime as datetime
 import pytz, openpyxl, os, sys, json, traceback
 
 os.environ['TZ'] = 'Europe/Budapest'
 
-ALLOWED_USR = ['alma', 'teszt']
+ALLOWED_USR = ['alma', 'naptrB4fGdP']
 
 config = ""
 expversion = '1'
@@ -50,13 +52,13 @@ class KartyAdatok():
         return ";".join(a)
     def recalculate(self) -> None:
         WB = openpyxl.load_workbook("dl.xlsx", True)
-        WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+        #WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
         self.data = []
 
         try:
             # félév váltásnál ezt át kell írni!
-            SH = WB["2023tavasz"]
-            SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
+            SH = WB["2023ősz"]
+            #SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
         except Exception as e:
             print("Exception occoured while trying to get the workbook. It's basicly the following: "+str(e))
             return
@@ -103,7 +105,7 @@ class KartyAdatok():
         
         print("  > last row hit at "+str(lst)+", with id "+str(lst[-1]))
 
-        for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+        """ for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
             interlist = []
             frow = True
 
@@ -131,12 +133,18 @@ class KartyAdatok():
             lst = rebindls
             self.data.append(rebindls)
             i += 1
-
+ """
         #self.debugPrinter()
         self.data = sorted(self.data, key=lambda x: (x[0], x[2]))
 
         print("  > last row hit at "+str(lst)+", with id "+str(lst[-1]))
         print("Recalculated the workbook, now it has "+str(len(self.data))+" rows.")
+
+def calcTextHet(hasznosHetekKezdo):
+    textHasznHetek = []
+    for x in hasznosHetekKezdo:
+        textHasznHetek.append(x.strftime("%Y-%m-%d"))
+    return textHasznHetek
 
 def calcMax(databs) -> KartyAdatok:
     outdb = KartyAdatok()
@@ -155,7 +163,7 @@ def calcFilterIDWeek(databs, hasznosHetek, filterWeekId='null', filterRowId='nul
         for x in databs.data:
             if(x[0] == 'ismeretlen'):
                 break
-            elif x[-1] == int(rid) and datetime.datetime.strptime(x[0], "%Y-%m-%d").weekday() != 6 and datetime.datetime.strptime(x[0], "%Y-%m-%d").isocalendar()[1] != hasznosHetek[int(filterWeekId)].isocalendar()[1]:
+            elif x[-1] == int(rid) and datetime.datetime.strptime(x[0], "%Y-%m-%d").weekday() != 6 and datetime.datetime.strptime(x[0], "%Y-%m-%d").isocalendar()[1] == hasznosHetek[int(filterWeekId)].isocalendar()[1]:
                 outdb[datetime.datetime.strptime(x[0], "%Y-%m-%d").weekday()].addRow(x)
                 break
     return outdb
@@ -252,7 +260,7 @@ def refreshExcel():
         f.close()
         datelast = datetime.datetime.now()
 
-    datext = datetime.datetime.now() - datetime.timedelta(hours=12)
+    datext = datetime.datetime.now() - datetime.timedelta(minutes=15)
 
     if(datelast >= datext):
         print("Shouldn't refresh table: it's not too old")
@@ -270,7 +278,7 @@ def refreshExcel():
     ctx_auth = AuthenticationContext(url)
     ctx_auth.acquire_token_for_user(username, password)   
     ctx = ClientContext(url, ctx_auth)
-    file_url = "/sites/GTKstudents/Megosztott%20dokumentumok/%C3%93rarendek/ELTE_GTK_orarend_2022_2023_II.xlsx"
+    file_url = "/sites/GTKstudents/Megosztott%20dokumentumok/%C3%93rarendek/ELTE_GTK_orarend_2023_2024_I.xlsx"
     filename = "dl.xlsx"
 
     file_path = os.path.abspath(filename)
@@ -280,16 +288,19 @@ def refreshExcel():
         ctx.execute_query()
     print(f" Excel refreshed: {file_path}")
 
-    file_url = "/sites/GTKstudents/Megosztott%20dokumentumok/Szamonkeresek/ELTE_GTK_Szamonkeres_idopontok_2023_tavasz.xlsx"
+    file_url = ""
     filename = "dlvizs.xlsx"
 
-    file_path = os.path.abspath(filename)
-    with open(file_path, "wb") as local_file:
-        file = ctx.web.get_file_by_server_relative_url(file_url)
-        file.download(local_file)
-        ctx.execute_query()
-    print(f" Excel refreshed: {file_path}")
-    db.recalculate()
+    if(file_url == ""):
+        print(f" Excel skipped - no URL given")
+    else:
+        file_path = os.path.abspath(filename)
+        with open(file_path, "wb") as local_file:
+            file = ctx.web.get_file_by_server_relative_url(file_url)
+            file.download(local_file)
+            ctx.execute_query()
+        print(f" Excel refreshed: {file_path}")
+        db.recalculate()
     return True
 
 ## összehasonlítja a tárolt órarendet (ami jsonben van) a jelenlegi órarendel, majd feldobja a választ
@@ -344,14 +355,14 @@ def calcDiff(db:KartyAdatok, username:str) -> list:
 
 def calcHasznosHetek():
     WB = openpyxl.load_workbook("dl.xlsx", True)
-    WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+    #WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
     hasznosHetek = []
     weekNums = []
     startDate = []
 
     try:
-        SH = WB["2023tavasz"]
-        SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
+        SH = WB["2023ősz"]
+        #SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
     except Exception as e:
         return ["2000-01-01"]
     
@@ -362,12 +373,12 @@ def calcHasznosHetek():
             weekNums.append(row[0].value.isocalendar()[1])
             startDate.append(row[0].value)
 
-    for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
-        if(row[0].value == None or row[0].value == "" or row[0].value == " "):
-            continue
-        if row[0].value.isocalendar()[1] not in weekNums:
-            weekNums.append(row[0].value.isocalendar()[1])
-            startDate.append(row[0].value)
+    #for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+    #    if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+    #        continue
+    #    if row[0].value.isocalendar()[1] not in weekNums:
+    #        weekNums.append(row[0].value.isocalendar()[1])
+    #        startDate.append(row[0].value)
 
     for x in range(0,len(weekNums)):
         hasznosHetek.append(str(weekNums[x]))
@@ -376,14 +387,14 @@ def calcHasznosHetek():
 
 def calcHasznosDatumok():
     WB = openpyxl.load_workbook("dl.xlsx", True)
-    WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+    #WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
     hasznosDatumok = []
     dates = []
     naps = []
 
     try:
-        SH = WB["2023tavasz"]
-        SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
+        SH = WB["2023ősz"]
+        #SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
     except Exception as e:
         return ["2000-01-01"]
     
@@ -409,7 +420,7 @@ def calcHasznosDatumok():
             else:
                 naps.append(row[1].value)
 
-    for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+    """ for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
         if(row[0].value == None or row[0].value == "" or row[0].value == " "):
             continue
         if row[0].value not in dates:
@@ -429,7 +440,7 @@ def calcHasznosDatumok():
             elif(row[1].value == "Sunday"):
                 naps.append("vasárnap")
             else:
-                naps.append(row[1].value)
+                naps.append(row[1].value) """
 
     for x in range(0,len(dates)):
         hasznosDatumok.append(str(dates[x])[:10])
@@ -437,7 +448,10 @@ def calcHasznosDatumok():
     return (hasznosDatumok,naps)
 
 app = Flask(__name__)
-app.secret_key = "REALLY_SECRET"
+app.secret_key = config.get("SECRET_KEY")
+
+SECRET_KEY = config.get("SECRET_KEY")
+serializer = URLSafeSerializer(SECRET_KEY)
 
 db = KartyAdatok()
     
@@ -463,7 +477,7 @@ def refresh(name="Frissítés"):
         db.recalculate
         return redirect("/?sikeresen_frissitettem_a_tablat")
     db.recalculate
-    return redirect("/?nem_tudom_frissiteni_a_tablat_mert_nem_telt_el_12_ora")
+    return redirect("/?nem_tudom_frissiteni_a_tablat_mert_nem_telt_el_15_perc")
 
 @app.route('/diff', methods = ['GET', 'POST'])
 def diff(name="Órarendváltozás-ellenőrzés"):
@@ -545,7 +559,7 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
                         event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[1], '%Y-%m-%d %H:%M')) 
                     
                     event.add('priority', 5)
-                    event['uid'] = '2023tavasz/ID'+str(sor[-1])
+                    event['uid'] = '2023osz/ID'+str(sor[-1])
                     event['location'] = vText(sor[7])
                     
                     cal.add_component(event)
@@ -577,27 +591,34 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
 @app.route('/', methods = ['GET', 'POST'])
 def index(name="Index", usname=""):
     view = session.get('view')
-    username = session.get('username')
+    usernameCookie = request.cookies.get('usrid')
+    session['username'] = 'unknown'
     isUser = None
 
     if(request.method == "POST"):
         try:
             isUser = request.form['username'] 
-            print('new user:'+request.form['username'])
+            print(f'new user:'+request.form['username'])
         except Exception as e:
-            print("Tried to get username, but "+str(e))
+            print(f"Tried to get username, but "+str(e))
             isUser = None
 
     if view is None:
         session['view'] = 'list'
 
     if isUser is not None:
-        session['username'] = request.form['username'] 
-    elif username == None:
-        session['username'] = 'unknown'
+        session['username'] = request.form['username']
+    elif usernameCookie:
+        try:
+            usernameCookie = serializer.loads(usernameCookie)
+            session['username'] = usernameCookie
+            isUser = usernameCookie
+        except Exception as e:
+            print("Bad Signature found, returning nothing.")
+            session['username'] = 'ismeretlen'
 
     if(session['username'] in ALLOWED_USR):
-        print('viewer: '+session['view'])
+        print(f'viewer: '+session['view'])
 
         try:
             search_date = request.form['sz1']
@@ -635,7 +656,7 @@ def index(name="Index", usname=""):
                 try:
                     if(session['view'] == 'list'):
                         selectdb = calcFilterID(db, validk)
-                        return render_template(
+                        resp = make_response(render_template(
                             'index.html',
                             name=name,
                             usname=session["username"],
@@ -644,8 +665,8 @@ def index(name="Index", usname=""):
                             hasznosDatHossz=len(interHasznDatumok),
                             hasznosHetek=interHasznHetek,
                             hasznosHetekHossz=len(interHasznHetek),
-                            hasznosHetekKezdo=interHasznHetKezdo,
-                            kartyadatok=selectdb.data, 
+                            hasznosHetekKezdo=calcTextHet(interHasznHetKezdo),
+                            kartyadatok=sorted(selectdb.data, key=iget(0,2)), 
                             kartyahossz=selectdb.getLength(),
                             filterdate=nullint(search_date),
                             filterkod=nullstr(search_targykod),
@@ -655,10 +676,10 @@ def index(name="Index", usname=""):
                             startpg=True,
                             elerhetoKartyaIdk = selectdb.felsorolo(),
                             view=session['view']
-                        )
+                        ))
                     else:
                         filterdb = calcFilterIDWeek(db, interHasznHetKezdo, search_date, validk)
-                        return render_template(
+                        resp = make_response(render_template(
                             'index.html',
                             name=name,
                             usname=session["username"],
@@ -667,9 +688,9 @@ def index(name="Index", usname=""):
                             hasznosDatHossz=len(interHasznDatumok),
                             hasznosHetek=interHasznHetek,
                             hasznosHetekHossz=len(interHasznHetek),
-                            hasznosHetekKezdo=interHasznHetKezdo,
+                            hasznosHetekKezdo=calcTextHet(interHasznHetKezdo),
                             hasznosHetekNapjai=["hétfő","kedd","szerda","csütörtök","péntek","szombat"],
-                            kartyadatok=filterdb,
+                            kartyadatok=sorted(filterdb, key=iget(0,2)),
                             osszhossz=len(filterdb),
                             kartyahossz=len(filterdb[0].data)+len(filterdb[1].data)+len(filterdb[2].data)+len(filterdb[3].data)+len(filterdb[4].data)+len(filterdb[5].data),
                             filterhet=nullint(search_date),
@@ -680,14 +701,16 @@ def index(name="Index", usname=""):
                             startpg=False,
                             elerhetoKartyaIdk = filterdb[0].felsorolo()+filterdb[1].felsorolo()+filterdb[2].felsorolo()+filterdb[3].felsorolo()+filterdb[4].felsorolo()+filterdb[5].felsorolo(),
                             view=session['view']
-                        )
+                        ))
+                    resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
+                    return resp
                 except Exception as e:
                     print("Error in selectdb, e:"+str(e))
                     print(traceback.format_exc())
     
             elif(session['view'] == 'list'):
                 filterdb = calcFilter(db.data, interHasznDatumok, search_date, search_targykod, search_targynev, search_kurzuskod)
-                return render_template(
+                resp = make_response(render_template(
                     'index.html',
                     name=name,
                     usname=session["username"],
@@ -696,8 +719,8 @@ def index(name="Index", usname=""):
                     hasznosDatHossz=len(interHasznDatumok),
                     hasznosHetek=interHasznHetek,
                     hasznosHetekHossz=len(interHasznHetek),
-                    hasznosHetekKezdo=interHasznHetKezdo,
-                    kartyadatok=filterdb.data, 
+                    hasznosHetekKezdo=calcTextHet(interHasznHetKezdo),
+                    kartyadatok=sorted(filterdb.data, key=iget(0,2)), 
                     kartyahossz=filterdb.getLength(),
                     filterdate=nullint(search_date),
                     filterkod=nullstr(search_targykod),
@@ -707,11 +730,13 @@ def index(name="Index", usname=""):
                     startpg=False,
                     elerhetoKartyaIdk = filterdb.felsorolo(),
                     view=session['view']
-                )
+                ))
+                resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
+                return resp
             else:
                 filterdb = calcFilterWeeks(db.data, interHasznHetKezdo, search_date, search_targykod, search_targynev, search_kurzuskod)
                 print("Kartya hossza 1:"+str(len(filterdb[0].data)+len(filterdb[1].data)+len(filterdb[2].data)+len(filterdb[3].data)+len(filterdb[4].data)+len(filterdb[5].data)))
-                return render_template(
+                resp = make_response(render_template(
                     'index.html',
                     name=name,
                     usname=session["username"],
@@ -720,9 +745,9 @@ def index(name="Index", usname=""):
                     hasznosDatHossz=len(interHasznDatumok),
                     hasznosHetek=interHasznHetek,
                     hasznosHetekHossz=len(interHasznHetek),
-                    hasznosHetekKezdo=interHasznHetKezdo,
+                    hasznosHetekKezdo=calcTextHet(interHasznHetKezdo),
                     hasznosHetekNapjai=["hétfő","kedd","szerda","csütörtök","péntek","szombat"],
-                    kartyadatok=filterdb,
+                    kartyadatok=sorted(filterdb, key=iget(0,2)),
                     osszhossz=len(filterdb),
                     kartyahossz=len(filterdb[0].data)+len(filterdb[1].data)+len(filterdb[2].data)+len(filterdb[3].data)+len(filterdb[4].data)+len(filterdb[5].data),
                     filterhet=nullint(search_date),
@@ -733,11 +758,13 @@ def index(name="Index", usname=""):
                     startpg=False,
                     elerhetoKartyaIdk = filterdb[0].felsorolo()+";"+filterdb[1].felsorolo()+";"+filterdb[2].felsorolo()+";"+filterdb[3].felsorolo()+";"+filterdb[4].felsorolo()+";"+filterdb[5].felsorolo(),
                     view=session['view']
-                )
+                ))
+                resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
+                return resp
         except Exception as e:
             print("Tried to show the filtered stuff, but "+str(e))
-            print(traceback.format_exc())
-        return render_template(
+            #print(traceback.format_exc())
+        resp = make_response(render_template(
             'index.html',
             name=name,
             usname=session["username"],
@@ -746,10 +773,10 @@ def index(name="Index", usname=""):
             hasznosDatHossz=len(interHasznDatumok),
             hasznosHetek=interHasznHetek,
             hasznosHetekHossz=len(interHasznHetek),
-            hasznosHetekKezdo=interHasznHetKezdo,
-            kartyadatok=calcMax(db).data, 
+            hasznosHetekKezdo=calcTextHet(interHasznHetKezdo),
+            kartyadatok=sorted(calcMax(db).data, key=iget(0,2)), 
             kartyahossz=0,
-            filterdate=nullint(0),
+            filterdate=nullint(""),
             filterhet='ismeretlen',
             filterkod=nullstr(''),
             filternev=nullstr(''),
@@ -758,7 +785,9 @@ def index(name="Index", usname=""):
             startpg=True,
             elerhetoKartyaIdk = 0,
             view=session['view']
-        )
+        ))
+        resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
+        return resp
     session['view'] = 'list'
     return render_template(
         'index.html',
@@ -767,7 +796,7 @@ def index(name="Index", usname=""):
         hasznosDatumok=interHasznDatumok,
         hasznosNapok=interHasznNapok,
         hasznosDatHossz=len(interHasznDatumok),
-        kartyadatok=calcMax(db).data,
+        kartyadatok=sorted(calcMax(db).data, key=iget(0,2)),
         kartyahossz=0,
         filterdate=nullint(""),
         filterkod=nullstr(""),
