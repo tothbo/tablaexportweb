@@ -4,6 +4,6 @@ localconfig.json
 dl.xlsx
 dlvizs.xlsx
 *.ics
-lastpull.txt
 remind.py
 *.json
+lastpull.txt

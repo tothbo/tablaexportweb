@@ -8,24 +8,21 @@ from operator import itemgetter as iget
 import datetime as datetime
 import pytz, openpyxl, os, sys, json, traceback
 
-os.environ['TZ'] = 'Europe/Budapest'
-
-ALLOWED_USR = ['alma', 'naptrB4fGdP']
-
-config = ""
-expversion = '1'
-
 # itt tároljuk el a belépési adatokat a SharePointhoz. Mivel a fejlesztés Windowson, az éles/teszt környezet pedig Linuxon (Ubuntu 22) volt/van,
 # ezért linuxon a configok között eltárolt json fájlt, developmenthez pedig a lokális jsont használjuk (így a publikus internetre nem kerül ki a jelszó,
 # a szerveren pedig korlátozva van a hozzáférés ezekhez az adatokhoz). Optimális megoldás az lenne, ha OAuth2-vel bejelentkeztetnénk, majd token használatával
 # lenne lekérve az új excel, de ez nem került implementálásra. B opció az API használat (api kulcsal), de ez le van tiltva az ELTE SharePointon :(
 
+config = ''
+
 if(sys.platform == "linux" or sys.platform == "linux2"):
-    with open('/etc/config.json') as config_file:
+    with open('/etc/config.json', encoding='utf8') as config_file:
         config = json.load(config_file)
 else:
-    with open('./localconfig.json') as config_file:
+    with open('./localconfig.json', encoding='utf8') as config_file:
         config = json.load(config_file)
+
+os.environ['TZ'] = config.get('TIME_ZONE')
 
 class KartyAdatok():
     def __init__(self) -> None:
@@ -51,94 +48,99 @@ class KartyAdatok():
             a.append(str(x[-1]))
         return ";".join(a)
     def recalculate(self) -> None:
-        WB = openpyxl.load_workbook("dl.xlsx", True)
-        #WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+        if(config.get("MAIN_WBURL") != ""):
+            WB = openpyxl.load_workbook("dl.xlsx", True)
+        if(config.get("SEC_WBURL") != ""):
+            WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
         self.data = []
 
         try:
             # félév váltásnál ezt át kell írni!
-            SH = WB["2023ősz"]
-            #SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
+            if(config.get("MAIN_WBSHEET") != ''):
+                SH = WB[config.get("MAIN_WBSHEET")]
+            if(config.get("SEC_WBSHEET") != ''):
+                SHvizs = WBvizs[config.get("SEC_WBSHEET")]
         except Exception as e:
             print("Exception occoured while trying to get the workbook. It's basicly the following: "+str(e))
             return
         i = 0
-        for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):  
-            interlist = []
-            frow = True
+        if(config.get("MAIN_WBSHEET") != ''):
+            for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):  
+                interlist = []
+                frow = True
 
-            if(row[3].value == "" or row[3].value == " "):
-                break
-            elif((row[3].value == "EmptyCell" or row[3].value is None) and (row[0].value == "EmptyCell" or row[0].value is None)):
-                break
+                if(row[3].value == "" or row[3].value == " "):
+                    break
+                elif((row[3].value == "EmptyCell" or row[3].value is None) and (row[0].value == "EmptyCell" or row[0].value is None)):
+                    break
 
-            for cell in row:
-                if(frow and type(cell.value) == datetime.datetime):
-                    interlist.append(cell.value.strftime('%Y-%m-%d'))
-                    frow = False
-                elif(frow):
-                    interlist.append("ismeretlen")
-                    frow = False
-                elif(type(cell.value) == None or cell.value == None):
-                    interlist.append("ismeretlen")
-                elif(cell.value == "Monday"):
-                    interlist.append("hétfő")
-                elif(cell.value == "Tuesday"):
-                    interlist.append("kedd")
-                elif(cell.value == "Wednesday"):
-                    interlist.append("szerda")
-                elif(cell.value == "Thursday"):
-                    interlist.append("csütörtök")
-                elif(cell.value == "Friday"):
-                    interlist.append("péntek")
-                elif(cell.value == "Saturday"):
-                    interlist.append("szombat")
-                elif(cell.value == "Sunday"):
-                    interlist.append("vasárnap")
-                else:
-                    interlist.append(cell.value)
+                for cell in row:
+                    if(frow and type(cell.value) == datetime.datetime):
+                        interlist.append(cell.value.strftime('%Y-%m-%d'))
+                        frow = False
+                    elif(frow):
+                        interlist.append("ismeretlen")
+                        frow = False
+                    elif(type(cell.value) == None or cell.value == None):
+                        interlist.append("ismeretlen")
+                    elif(cell.value == "Monday"):
+                        interlist.append("hétfő")
+                    elif(cell.value == "Tuesday"):
+                        interlist.append("kedd")
+                    elif(cell.value == "Wednesday"):
+                        interlist.append("szerda")
+                    elif(cell.value == "Thursday"):
+                        interlist.append("csütörtök")
+                    elif(cell.value == "Friday"):
+                        interlist.append("péntek")
+                    elif(cell.value == "Saturday"):
+                        interlist.append("szombat")
+                    elif(cell.value == "Sunday"):
+                        interlist.append("vasárnap")
+                    else:
+                        interlist.append(cell.value)
 
-            interlist.append(i)
-            lst = interlist
-            self.data.append(interlist)
-            i += 1
-        
-        print("  > last row hit at "+str(lst)+", with id "+str(lst[-1]))
+                interlist.append(i)
+                lst = interlist
+                self.data.append(interlist)
+                i += 1
+            
+            print("  > MAIN last row hit at "+str(lst)+", with id "+str(lst[-1]))
+        else:
+            print("  > MAIN table not found.") 
 
-        """ for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
-            interlist = []
-            frow = True
+        if(config.get("SEC_WBSHEET") != ''):
+            for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+                interlist = []
+                frow = True
 
-            if(row[3].value == "" or row[3].value == " "):
-                break
-            elif((row[3].value == "EmptyCell" or row[3].value is None) and (row[0].value == "EmptyCell" or row[0].value is None)):
-                break
+                if(row[3].value == "" or row[3].value == " "):
+                    break
+                elif((row[3].value == "EmptyCell" or row[3].value is None) and (row[0].value == "EmptyCell" or row[0].value is None)):
+                    break
 
-            countr = 0
-            trl = ''
+                for cell in row:
+                    if(frow and type(cell.value) == datetime.datetime):
+                        interlist.append(cell.value.strftime('%Y-%m-%d'))
+                        frow = False
+                    elif(frow):
+                        interlist.append("ismeretlen")
+                        frow = False
+                    elif(type(cell.value) == None or cell.value == None):
+                        interlist.append("ismeretlen")
+                    else:
+                        interlist.append(cell.value)
 
-            for cell in row:
-                if(frow and type(cell.value) == datetime.datetime):
-                    interlist.append(cell.value.strftime('%Y-%m-%d'))
-                    frow = False
-                elif(frow):
-                    interlist.append("ismeretlen")
-                    frow = False
-                elif(type(cell.value) == None or cell.value == None):
-                    interlist.append("ismeretlen")
-                else:
-                    interlist.append(cell.value)
+                rebindls = [interlist[0],interlist[1],interlist[2],interlist[3],interlist[4],interlist[5],"Típus: "+interlist[7],interlist[6],i]
+                lst = rebindls
+                self.data.append(rebindls)
+                i += 1
 
-            rebindls = [interlist[0],interlist[1],interlist[2],interlist[3],interlist[4],interlist[5],"Típus: "+interlist[7],interlist[6],i]
-            lst = rebindls
-            self.data.append(rebindls)
-            i += 1
- """
-        #self.debugPrinter()
+            print("  > SECONDARY last row hit at "+str(lst)+", with id "+str(lst[-1]))
+        else:
+            print("  > SECONDARY table not found.")        
         self.data = sorted(self.data, key=lambda x: (x[0], x[2]))
-
-        print("  > last row hit at "+str(lst)+", with id "+str(lst[-1]))
-        print("Recalculated the workbook, now it has "+str(len(self.data))+" rows.")
+        print("Recalculated all the workbooks, now we have "+str(len(self.data))+" rows.")
 
 def calcTextHet(hasznosHetekKezdo):
     textHasznHetek = []
@@ -166,6 +168,8 @@ def calcFilterIDWeek(databs, hasznosHetek, filterWeekId='null', filterRowId='nul
             elif x[-1] == int(rid) and datetime.datetime.strptime(x[0], "%Y-%m-%d").weekday() != 6 and datetime.datetime.strptime(x[0], "%Y-%m-%d").isocalendar()[1] == hasznosHetek[int(filterWeekId)].isocalendar()[1]:
                 outdb[datetime.datetime.strptime(x[0], "%Y-%m-%d").weekday()].addRow(x)
                 break
+    for kdata in outdb:
+        kdata.data.sort(key=lambda x: x[2].split("-")[0])
     return outdb
           
 def calcFilterID(databs, filterRowId='null'):
@@ -271,36 +275,35 @@ def refreshExcel():
         f.close()
         print("We should refresh the table now!")
 
-    url = "https://eltehu.sharepoint.com/sites/GTKstudents"
+    url = config.get("SP_URL")
     username = config.get('GTKUSER')
     password = config.get('GTKPASS')
 
     ctx_auth = AuthenticationContext(url)
     ctx_auth.acquire_token_for_user(username, password)   
     ctx = ClientContext(url, ctx_auth)
-    file_url = "/sites/GTKstudents/Megosztott%20dokumentumok/%C3%93rarendek/ELTE_GTK_orarend_2023_2024_I.xlsx"
-    filename = "dl.xlsx"
 
-    file_path = os.path.abspath(filename)
-    with open(file_path, "wb") as local_file:
-        file = ctx.web.get_file_by_server_relative_url(file_url)
-        file.download(local_file)
-        ctx.execute_query()
-    print(f" Excel refreshed: {file_path}")
+    if(config.get("MAIN_WBURL") != ""):
+        filename = "dl.xlsx"
 
-    file_url = ""
-    filename = "dlvizs.xlsx"
-
-    if(file_url == ""):
-        print(f" Excel skipped - no URL given")
-    else:
         file_path = os.path.abspath(filename)
         with open(file_path, "wb") as local_file:
-            file = ctx.web.get_file_by_server_relative_url(file_url)
+            file = ctx.web.get_file_by_server_relative_url(config.get("MAIN_WBURL"))
             file.download(local_file)
             ctx.execute_query()
         print(f" Excel refreshed: {file_path}")
-        db.recalculate()
+
+    if(config.get("SEC_WBURL") != ''):
+        filename = "dlvizs.xlsx"
+
+        file_path = os.path.abspath(filename)
+        with open(file_path, "wb") as local_file:
+            file = ctx.web.get_file_by_server_relative_url(config.get("SEC_WBURL"))
+            file.download(local_file)
+            ctx.execute_query()
+        print(f" Excel refreshed: {file_path}")
+    
+    db.recalculate()
     return True
 
 ## összehasonlítja a tárolt órarendet (ami jsonben van) a jelenlegi órarendel, majd feldobja a választ
@@ -310,7 +313,7 @@ def calcDiff(db:KartyAdatok, username:str) -> list:
     oldjs = json.load(f)
     backdb = []
 
-    if(oldjs['expversion'] != expversion):
+    if(oldjs['expversion'] != config.get('EXPVERSION')):
         raise Exception("Export version missmatch.")
 
     for x in oldjs['entries']:
@@ -354,31 +357,38 @@ def calcDiff(db:KartyAdatok, username:str) -> list:
 ## itt számoljuk ki a hasznos dátumokat > azokat amiket meg is fogunk jeleníteni a dropdownban
 
 def calcHasznosHetek():
-    WB = openpyxl.load_workbook("dl.xlsx", True)
-    #WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+    if(config.get("MAIN_WBURL") != ""):
+        WB = openpyxl.load_workbook("dl.xlsx", True)
+    if(config.get("SEC_WBURL") != ""):
+        WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
     hasznosHetek = []
     weekNums = []
     startDate = []
 
     try:
-        SH = WB["2023ősz"]
-        #SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
+        if(config.get("MAIN_WBSHEET") != ""):
+            SH = WB[config.get("MAIN_WBSHEET")]
+        if(config.get("SEC_WBSHEET") != ""):
+            SHvizs = WBvizs[config.get("SEC_WBSHEET")]
     except Exception as e:
         return ["2000-01-01"]
+        raise SystemExit("No valid workbook found in calcHasznosHetek - you can't start the webapp without valid data")
     
-    for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
-        if(row[0].value == None or row[0].value == "" or row[0].value == " "):
-            continue
-        if row[0].value.isocalendar()[1] not in weekNums:
-            weekNums.append(row[0].value.isocalendar()[1])
-            startDate.append(row[0].value)
+    if(config.get("MAIN_WBSHEET") != ""):
+        for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
+            if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+                continue
+            if row[0].value.isocalendar()[1] not in weekNums:
+                weekNums.append(row[0].value.isocalendar()[1])
+                startDate.append(row[0].value)
 
-    #for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
-    #    if(row[0].value == None or row[0].value == "" or row[0].value == " "):
-    #        continue
-    #    if row[0].value.isocalendar()[1] not in weekNums:
-    #        weekNums.append(row[0].value.isocalendar()[1])
-    #        startDate.append(row[0].value)
+    if(config.get("SEC_WBSHEET") != ""):
+        for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+            if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+                continue
+            if row[0].value.isocalendar()[1] not in weekNums:
+                weekNums.append(row[0].value.isocalendar()[1])
+                startDate.append(row[0].value)
 
     for x in range(0,len(weekNums)):
         hasznosHetek.append(str(weekNums[x]))
@@ -386,65 +396,72 @@ def calcHasznosHetek():
     return (hasznosHetek, startDate)
 
 def calcHasznosDatumok():
-    WB = openpyxl.load_workbook("dl.xlsx", True)
-    #WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+    if(config.get("MAIN_WBURL") != ""):
+        WB = openpyxl.load_workbook("dl.xlsx", True)
+    if(config.get("SEC_WBURL") != ""):
+        WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
     hasznosDatumok = []
     dates = []
     naps = []
 
     try:
-        SH = WB["2023ősz"]
-        #SHvizs = WBvizs["ELTE_GTK_ZH_2023_tavasz"]
+        if(config.get("MAIN_WBSHEET") != ""):
+            SH = WB[config.get("MAIN_WBSHEET")]
+        if(config.get("SEC_WBSHEET") != ""):
+            SHvizs = WBvizs[config.get("SEC_WBSHEET")]
     except Exception as e:
         return ["2000-01-01"]
+        raise SystemExit("No valid workbook found in calcHasznosDatumok - you can't start the webapp without data")
     
-    for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
-        if(row[0].value == None or row[0].value == "" or row[0].value == " "):
-            continue
-        if row[0].value not in dates:
-            dates.append(row[0].value)
-            if(row[1].value == "Monday"):
-                naps.append("hétfő")
-            elif(row[1].value == "Tuesday"):
-                naps.append("kedd")
-            elif(row[1].value == "Wednesday"):
-                naps.append("szerda")
-            elif(row[1].value == "Thursday"):
-                naps.append("csütörtök")
-            elif(row[1].value == "Friday"):
-                naps.append("péntek")
-            elif(row[1].value == "Saturday"):
-                naps.append("szombat")
-            elif(row[1].value == "Sunday"):
-                naps.append("vasárnap")
-            else:
-                naps.append(row[1].value)
-
-    """ for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
-        if(row[0].value == None or row[0].value == "" or row[0].value == " "):
-            continue
-        if row[0].value not in dates:
-            dates.append(row[0].value)
-            if(row[1].value == "Monday"):
-                naps.append("hétfő")
-            elif(row[1].value == "Tuesday"):
-                naps.append("kedd")
-            elif(row[1].value == "Wednesday"):
-                naps.append("szerda")
-            elif(row[1].value == "Thursday"):
-                naps.append("csütörtök")
-            elif(row[1].value == "Friday"):
-                naps.append("péntek")
-            elif(row[1].value == "Saturday"):
-                naps.append("szombat")
-            elif(row[1].value == "Sunday"):
-                naps.append("vasárnap")
-            else:
-                naps.append(row[1].value) """
+    if(config.get("MAIN_WBSHEET") != ""):
+        for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
+            if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+                continue
+            if row[0].value not in dates:
+                dates.append(row[0].value)
+                if(row[1].value == "Monday"):
+                    naps.append("hétfő")
+                elif(row[1].value == "Tuesday"):
+                    naps.append("kedd")
+                elif(row[1].value == "Wednesday"):
+                    naps.append("szerda")
+                elif(row[1].value == "Thursday"):
+                    naps.append("csütörtök")
+                elif(row[1].value == "Friday"):
+                    naps.append("péntek")
+                elif(row[1].value == "Saturday"):
+                    naps.append("szombat")
+                elif(row[1].value == "Sunday"):
+                    naps.append("vasárnap")
+                else:
+                    naps.append(row[1].value)
+    
+    if(config.get("SEC_WBSHEET") != ""):
+        for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
+            if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+                continue
+            if row[0].value not in dates:
+                dates.append(row[0].value)
+                if(row[1].value == "Monday"):
+                    naps.append("hétfő")
+                elif(row[1].value == "Tuesday"):
+                    naps.append("kedd")
+                elif(row[1].value == "Wednesday"):
+                    naps.append("szerda")
+                elif(row[1].value == "Thursday"):
+                    naps.append("csütörtök")
+                elif(row[1].value == "Friday"):
+                    naps.append("péntek")
+                elif(row[1].value == "Saturday"):
+                    naps.append("szombat")
+                elif(row[1].value == "Sunday"):
+                    naps.append("vasárnap")
+                else:
+                    naps.append(row[1].value)
 
     for x in range(0,len(dates)):
         hasznosDatumok.append(str(dates[x])[:10])
-
+    
     return (hasznosDatumok,naps)
 
 app = Flask(__name__)
@@ -498,7 +515,7 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
         cal = Calendar()
         dct = {
             "desc":"Tábla Export JSON fájl",
-            "expversion":"1",
+            "expversion":config.get('EXPVERSION'),
             "for_user":request.form['usnamepost'],
             "entries":[]
         }
@@ -617,7 +634,7 @@ def index(name="Index", usname=""):
             print("Bad Signature found, returning nothing.")
             session['username'] = 'ismeretlen'
 
-    if(session['username'] in ALLOWED_USR):
+    if(session['username'] in config.get("ALLOWED")):
         print(f'viewer: '+session['view'])
 
         try:
@@ -690,7 +707,7 @@ def index(name="Index", usname=""):
                             hasznosHetekHossz=len(interHasznHetek),
                             hasznosHetekKezdo=calcTextHet(interHasznHetKezdo),
                             hasznosHetekNapjai=["hétfő","kedd","szerda","csütörtök","péntek","szombat"],
-                            kartyadatok=sorted(filterdb, key=iget(0,2)),
+                            kartyadatok=filterdb,
                             osszhossz=len(filterdb),
                             kartyahossz=len(filterdb[0].data)+len(filterdb[1].data)+len(filterdb[2].data)+len(filterdb[3].data)+len(filterdb[4].data)+len(filterdb[5].data),
                             filterhet=nullint(search_date),
@@ -747,7 +764,7 @@ def index(name="Index", usname=""):
                     hasznosHetekHossz=len(interHasznHetek),
                     hasznosHetekKezdo=calcTextHet(interHasznHetKezdo),
                     hasznosHetekNapjai=["hétfő","kedd","szerda","csütörtök","péntek","szombat"],
-                    kartyadatok=sorted(filterdb, key=iget(0,2)),
+                    kartyadatok=filterdb,
                     osszhossz=len(filterdb),
                     kartyahossz=len(filterdb[0].data)+len(filterdb[1].data)+len(filterdb[2].data)+len(filterdb[3].data)+len(filterdb[4].data)+len(filterdb[5].data),
                     filterhet=nullint(search_date),
