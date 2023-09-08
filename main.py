@@ -371,7 +371,6 @@ def calcHasznosHetek():
         if(config.get("SEC_WBSHEET") != ""):
             SHvizs = WBvizs[config.get("SEC_WBSHEET")]
     except Exception as e:
-        return ["2000-01-01"]
         raise SystemExit("No valid workbook found in calcHasznosHetek - you can't start the webapp without valid data")
     
     if(config.get("MAIN_WBSHEET") != ""):
@@ -410,7 +409,6 @@ def calcHasznosDatumok():
         if(config.get("SEC_WBSHEET") != ""):
             SHvizs = WBvizs[config.get("SEC_WBSHEET")]
     except Exception as e:
-        return ["2000-01-01"]
         raise SystemExit("No valid workbook found in calcHasznosDatumok - you can't start the webapp without data")
     
     if(config.get("MAIN_WBSHEET") != ""):

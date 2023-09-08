@@ -1,0 +1,28 @@
+{
+    "short_name": "Tábla Export",
+    "name": "Tábla Export",
+    "icons": [
+      {
+        "src": "/static/icon-192.png",
+        "type": "image/png",
+        "sizes": "192x192"
+      },
+      {
+        "src": "/static/icon-256.png",
+        "type": "image/png",
+        "sizes": "256x256"
+      },
+      {
+        "src": "/static/icon-512.png",
+        "type": "image/png",
+        "sizes": "512x512"
+      }
+    ],
+    "id": "/",
+    "start_url": "/",
+    "background_color": "#FFFFFF",
+    "display": "minimal-ui",
+    "scope": "/",
+    "theme_color": "#523566",
+    "description": "Tábla Export"
+  }

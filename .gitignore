@@ -1,9 +1,8 @@
-
+lastpull.txt
 *.pyc
 localconfig.json
 dl.xlsx
 dlvizs.xlsx
 *.ics
 remind.py
-*.json
-lastpull.txt
+tarolo/alma.json
