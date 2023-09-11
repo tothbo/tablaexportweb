@@ -5,4 +5,4 @@ dl.xlsx
 dlvizs.xlsx
 *.ics
 remind.py
-tarolo/alma.json
+tarolo/*.json

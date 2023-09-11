@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, request, redirect, url_for, send_file, send_from_directory, make_response
+from flask import Flask, render_template, session, request, redirect, url_for, send_file, send_from_directory, make_response, jsonify
 from icalendar import Calendar, Event, vCalAddress, vText
 from pathlib import Path
 from office365.runtime.auth.authentication_context import AuthenticationContext
@@ -257,12 +257,12 @@ def refreshExcel():
         datelast = datetime.datetime.strptime(f.readline(), '%Y-%m-%d %H:%M')
         f.close()
     except ValueError as e:
-        print("Exception occoured, probably empty file so we'll just include the time now.")
+        print("Exception occoured, probably empty file so we'll just include a random time now.")
         f.close
         f = open('lastpull.txt', 'w')
-        f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+        f.write((datetime.datetime.now() - datetime.timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M'))
         f.close()
-        datelast = datetime.datetime.now()
+        datelast = datetime.datetime.now() - datetime.timedelta(minutes=30)
 
     datext = datetime.datetime.now() - datetime.timedelta(minutes=15)
 
@@ -280,8 +280,11 @@ def refreshExcel():
     password = config.get('GTKPASS')
 
     ctx_auth = AuthenticationContext(url)
-    ctx_auth.acquire_token_for_user(username, password)   
+    if ctx_auth.acquire_token_for_user(username, password) == False:
+        raise SystemError("Username or password failed to authenticate with SharePoint Online.")
+    
     ctx = ClientContext(url, ctx_auth)
+    versnum = []
 
     if(config.get("MAIN_WBURL") != ""):
         filename = "dl.xlsx"
@@ -290,7 +293,10 @@ def refreshExcel():
         with open(file_path, "wb") as local_file:
             file = ctx.web.get_file_by_server_relative_url(config.get("MAIN_WBURL"))
             file.download(local_file)
+            ctx.load(file, ["Versions"])
             ctx.execute_query()
+            versnum.append(file.versions[-1].version_label)
+
         print(f" Excel refreshed: {file_path}")
 
     if(config.get("SEC_WBURL") != ''):
@@ -300,7 +306,9 @@ def refreshExcel():
         with open(file_path, "wb") as local_file:
             file = ctx.web.get_file_by_server_relative_url(config.get("SEC_WBURL"))
             file.download(local_file)
+            ctx.load(file, ["Versions"])
             ctx.execute_query()
+            versnum.append(file.versions[-1].version_label)
         print(f" Excel refreshed: {file_path}")
     
     db.recalculate()
@@ -309,7 +317,7 @@ def refreshExcel():
 ## összehasonlítja a tárolt órarendet (ami jsonben van) a jelenlegi órarendel, majd feldobja a választ
 
 def calcDiff(db:KartyAdatok, username:str) -> list:
-    f = open(os.getcwd()+'/tarolo/'+username+'.json', encoding='utf-8')
+    f = open(os.getcwd()+'/tarolo/'+username+'_lastexp.json', encoding='utf-8')
     oldjs = json.load(f)
     backdb = []
 
@@ -462,6 +470,14 @@ def calcHasznosDatumok():
     
     return (hasznosDatumok,naps)
 
+# elmenti a kurzuskódokat (apinak) / 5-ös oszlop valszleg a kurzuskód
+def saveCourseCodes(db, hasznosDatumok, courseCode):
+    backdb = []
+    filtered = calcFilter(db.data, hasznosDatumok, 'null', 'null', 'null', courseCode)
+    for sor in filtered.data:
+        backdb.append(sor[5])
+    return list(set(backdb))
+
 app = Flask(__name__)
 app.secret_key = config.get("SECRET_KEY")
 
@@ -506,7 +522,7 @@ def diff(name="Órarendváltozás-ellenőrzés"):
     return render_template('diff.html', resp=True, usname=a, diffdb=d)
 
 @app.route('/savecal', methods = ['GET', 'POST'])
-def savecal(name="Naptár exportálása", usname="", feldolg=[]):
+def saveCal(name="Naptár exportálása", usname="", feldolg=[]):
     feldolg=[]
     if(request.method == "POST"):
         #print("Írás megkezdése naptárba: "+request.form['usnamepost'])
@@ -597,7 +613,7 @@ def savecal(name="Naptár exportálása", usname="", feldolg=[]):
 
         jsonobj = json.dumps(dct, indent=4, ensure_ascii=False).encode('utf-8')
 
-        with open("./tarolo/"+request.form['usnamepost']+".json", "wb") as outfile:
+        with open("./tarolo/"+request.form['usnamepost']+"_lastexp.json", "wb") as outfile:
             outfile.write(jsonobj)
 
         print("Export done, everything went right!")
@@ -836,6 +852,23 @@ def change_view():
         return redirect(url_for('index'))
     except Exception as e:
         return str(e)
+    
+## APIk
+@app.route('/api/resource', methods=['POST'])
+def api_resource():
+    data = request.json
+    print(data)
+    try:
+        if(data['key'] != config.get('API_KEY')):
+            response_data = {'error_code': 'Not authorized'}
+            return jsonify(response_data), 401
+        backdb = saveCourseCodes(db, interHasznDatumok, data['course_code'])
+        response_data = {'response':True,'data': backdb}
+        return jsonify(response_data), 201
+    except Exception as e:
+        print(traceback.format_exc())
+        response_data = {'error_code': 'Request syntax error'}
+        return jsonify(response_data), 401
 
 ## fájlok
 @app.route('/cals/<path:path>')
@@ -873,12 +906,19 @@ def robotstxt():
     except Exception as e:
         return str(e)
 
+## error handlers
+@app.route('/api/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def api_other():
+    response_data = {'error_code': 'Unknown endpoint'}
+    return jsonify(response_data), 401
+
 @app.errorhandler(404)
 def err404(e):
     try:
         return render_template('404.html')
     except Exception as excp:
         return str(excp)
+    
 
 # ez indítja az actual servinget
 if __name__ == "__main__":
