@@ -1,4 +1,33 @@
-function getCourseCodes(apiKey, courseCode) {
+const inputField = document.getElementById('codeSearchField');
+
+let typingTimer;
+const doneTypingInterval = 1000;
+
+inputField.addEventListener('input', function () {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(function () {
+        // User has finished typing, perform request
+        console.log('User finished typing');
+        if(($('#codeSearchField').val() !== '' || $('#codeSearchField').val() !== ' ') && $('#codeSearchField').val().length >= 3){
+            calcCodePicker($('#codeSearchField').val());
+        }
+    }, doneTypingInterval);
+});
+
+async function calcCodePicker(text){
+    try{
+        arr = await getCourseCodes($('#apiKeyHolder').val(), text);
+    }catch (e){
+        console.log('Error with API: '+e);
+        return;
+    }
+    document.getElementById('codeSelector').innerHTML = '';
+    for(let i = 0; i < arr.data.length; i++){
+        document.getElementById('codeSelector').innerHTML += '<div class="row"><div class="col-8"><p>'+arr.data[i]+'</p></div><div class="col-4"><button class="btn btn-primary" onclick="followCourseCode(\''+arr.data[i]+'\')">Kiválaszt</button></div></div>';
+    }
+}
+
+async function getCourseCodes(apiKey, courseCode) {
     // Create a JSON object with the API key and course code
     let body = {
         key: apiKey,
@@ -12,19 +41,14 @@ function getCourseCodes(apiKey, courseCode) {
     let apiUrl = currentDomain + "/api/resource";
 
     // Set up AJAX settings to send a JSON request
-    $.ajax({
+    return $.ajax({
         url: apiUrl,
         type: "POST",
         contentType: "application/json",
-        data: JSON.stringify(body), // Convert the data to a JSON string
-        success: function (data, status) {
-            // Handle the response data (JSON) here
-            console.log(data);
-        },
-        error: function (xhr, textStatus, errorThrown) {
-            // Handle any errors here
-            console.error(xhr.statusText);
-            console.log(xhr)
-        }
+        data: JSON.stringify(body)
     });
+}
+
+function followCourseCode(courseID){
+    console.log(courseID);
 }

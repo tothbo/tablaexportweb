@@ -257,12 +257,12 @@ def refreshExcel():
         datelast = datetime.datetime.strptime(f.readline(), '%Y-%m-%d %H:%M')
         f.close()
     except ValueError as e:
-        print("Exception occoured, probably empty file so we'll just include a random time now.")
+        print("Exception occoured, probably empty file so we'll just include the time now.")
         f.close
         f = open('lastpull.txt', 'w')
-        f.write((datetime.datetime.now() - datetime.timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M'))
+        f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
         f.close()
-        datelast = datetime.datetime.now() - datetime.timedelta(minutes=30)
+        datelast = datetime.datetime.now()
 
     datext = datetime.datetime.now() - datetime.timedelta(minutes=15)
 
@@ -280,11 +280,8 @@ def refreshExcel():
     password = config.get('GTKPASS')
 
     ctx_auth = AuthenticationContext(url)
-    if ctx_auth.acquire_token_for_user(username, password) == False:
-        raise SystemError("Username or password failed to authenticate with SharePoint Online.")
-    
+    ctx_auth.acquire_token_for_user(username, password)   
     ctx = ClientContext(url, ctx_auth)
-    versnum = []
 
     if(config.get("MAIN_WBURL") != ""):
         filename = "dl.xlsx"
@@ -293,10 +290,7 @@ def refreshExcel():
         with open(file_path, "wb") as local_file:
             file = ctx.web.get_file_by_server_relative_url(config.get("MAIN_WBURL"))
             file.download(local_file)
-            ctx.load(file, ["Versions"])
             ctx.execute_query()
-            versnum.append(file.versions[-1].version_label)
-
         print(f" Excel refreshed: {file_path}")
 
     if(config.get("SEC_WBURL") != ''):
@@ -306,9 +300,7 @@ def refreshExcel():
         with open(file_path, "wb") as local_file:
             file = ctx.web.get_file_by_server_relative_url(config.get("SEC_WBURL"))
             file.download(local_file)
-            ctx.load(file, ["Versions"])
             ctx.execute_query()
-            versnum.append(file.versions[-1].version_label)
         print(f" Excel refreshed: {file_path}")
     
     db.recalculate()
@@ -471,12 +463,12 @@ def calcHasznosDatumok():
     return (hasznosDatumok,naps)
 
 # elmenti a kurzuskódokat (apinak) / 5-ös oszlop valszleg a kurzuskód
-def saveCourseCodes(db, hasznosDatumok, courseCode):
+def getCourseCodes(db, hasznosDatumok, courseCode):
     backdb = []
     filtered = calcFilter(db.data, hasznosDatumok, 'null', 'null', 'null', courseCode)
     for sor in filtered.data:
         backdb.append(sor[5])
-    return list(set(backdb))
+    return sorted(list(set(backdb)))
 
 app = Flask(__name__)
 app.secret_key = config.get("SECRET_KEY")
@@ -706,7 +698,8 @@ def index(name="Index", usname=""):
                             lasthit=lastHit(),
                             startpg=True,
                             elerhetoKartyaIdk = selectdb.felsorolo(),
-                            view=session['view']
+                            view=session['view'],
+                            apiKey=config.get('API_KEY')
                         ))
                     else:
                         filterdb = calcFilterIDWeek(db, interHasznHetKezdo, search_date, validk)
@@ -731,7 +724,8 @@ def index(name="Index", usname=""):
                             lasthit=lastHit(),
                             startpg=False,
                             elerhetoKartyaIdk = filterdb[0].felsorolo()+filterdb[1].felsorolo()+filterdb[2].felsorolo()+filterdb[3].felsorolo()+filterdb[4].felsorolo()+filterdb[5].felsorolo(),
-                            view=session['view']
+                            view=session['view'],
+                            apiKey=config.get('API_KEY')
                         ))
                     resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
                     return resp
@@ -760,7 +754,8 @@ def index(name="Index", usname=""):
                     lasthit=lastHit(),
                     startpg=False,
                     elerhetoKartyaIdk = filterdb.felsorolo(),
-                    view=session['view']
+                    view=session['view'],
+                    apiKey=config.get('API_KEY')
                 ))
                 resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
                 return resp
@@ -788,7 +783,8 @@ def index(name="Index", usname=""):
                     lasthit=lastHit(),
                     startpg=False,
                     elerhetoKartyaIdk = filterdb[0].felsorolo()+";"+filterdb[1].felsorolo()+";"+filterdb[2].felsorolo()+";"+filterdb[3].felsorolo()+";"+filterdb[4].felsorolo()+";"+filterdb[5].felsorolo(),
-                    view=session['view']
+                    view=session['view'],
+                    apiKey=config.get('API_KEY')
                 ))
                 resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
                 return resp
@@ -815,7 +811,8 @@ def index(name="Index", usname=""):
             lasthit=lastHit(),
             startpg=True,
             elerhetoKartyaIdk = 0,
-            view=session['view']
+            view=session['view'],
+            apiKey=config.get('API_KEY')
         ))
         resp.set_cookie('usrid', serializer.dumps(session['username']), expires=datetime.datetime.now() + datetime.timedelta(seconds=900), samesite='Strict')
         return resp
@@ -836,7 +833,8 @@ def index(name="Index", usname=""):
         lasthit=lastHit(),
         startpg = True,
         elerhetoKartyaIdk = 'null',
-        view=session['view']
+        view=session['view'],
+        apiKey=config.get('API_KEY')
     )
 
 ## nézetek
@@ -862,7 +860,7 @@ def api_resource():
         if(data['key'] != config.get('API_KEY')):
             response_data = {'error_code': 'Not authorized'}
             return jsonify(response_data), 401
-        backdb = saveCourseCodes(db, interHasznDatumok, data['course_code'])
+        backdb = getCourseCodes(db, interHasznDatumok, data['course_code'])
         response_data = {'response':True,'data': backdb}
         return jsonify(response_data), 201
     except Exception as e:
