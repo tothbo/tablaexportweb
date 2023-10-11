@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>{{ name }} > Tábla Export</title>
+        <link href="/static/bootstrap.min.css" rel="stylesheet" />
+    </head> 
+    <body>
+        <main class="container-fluid" id="main">
+            <div class="row">
+                <h1 class="text-center" style="size:1rem;">Naptárnézet: {{ usname }}</h1>
+                <div class="col text-center">
+                    <p>Exportálás megtörtént, a naptár elérhető lesz az alábbi linken (ezt kell a Google Naptárban, vagy egyéb alkalmazásban megadnod)</p>
+                    <p style="color:maroon">Fontos, hogy a naptárat a kurzuskód-követő bekapcsolásával folyamatosan felülírja a rendszer - ezért mielőtt manuálisan exportálnál, ki kell kapcsolni a kurzuskód követőt - dolgozunk azon, hogy ezt a grafikus felületről is meg lehessen oldani, ehhez most keress meg minket és kikapcsoljuk.<br/></p>
+                    <p><a href="https://tablaexport.csordanyom.hu/cals/{{ usname }}.ics">https://tablaexport.csordanyom.hu/cals/{{ usname }}.ics</a></p><br/>
+                    <p>Amennyiben szeretnéd, megtekintheted/lementheted az exportálás során készült json fájlt, ebben benne van minden kiválasztott tárgy minden adata. Jelenleg csak debug miatt van itt, későbbiekben a tárgyváltozások értesítésénél lesz használva, valamint ebből lesznek a tárgyak visszatöltve:</p>
+                    <p><a href="https://tablaexport.csordanyom.hu/tarolo/{{ usname }}_lastexp.json">https://tablaexport.csordanyom.hu/tarolo/{{ usname }}_lastexp.json</a></p>
+                    <p>Valamint a követett kurzuskódok JSON fájlját - ezt a technikai fájlt használjuk, hogy nyomonkövethessük a változásokat :)</p>
+                    <p><a href="https://tablaexport.csordanyom.hu/tarolo/{{ usname }}_lastexp.json">https://tablaexport.csordanyom.hu/tarolo/{{ usname }}_ccf.json</a></p>
+                    {% if feldolghossz != 0 %}
+                        <p>Sajnos a feldolgozásba hibák is jutottak, ezeket a sorokat nem tudtam a naptárba tenni:</p>
+                        <div class="accordion" id="hibaLista">
+                        {% for x in feldolg %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="acrd{{ x[-1] }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#coll{{ x[-1] }}" aria-expanded="false" aria-controls="coll{{ x[-1] }}">
+                                    Hiba az {{ x[-1] }} azonosítójú elem feldolgozása közben:
+                                </button>
+                                </h2>
+                                <div id="coll{{ x[-1] }}" class="accordion-collapse collapse" aria-labelledby="acrd{{ x[-1] }}" data-bs-parent="#hibaLista">
+                                <div class="accordion-body">
+                                    {{ x[0] }}
+                                </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+        <script src="/static/bootstrap.bundle.min.js"></script>
+
+    </body>
+</html> 

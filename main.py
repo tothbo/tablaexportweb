@@ -1,12 +1,11 @@
 from flask import Flask, render_template, session, request, redirect, url_for, send_file, send_from_directory, make_response, jsonify
 from icalendar import Calendar, Event, vCalAddress, vText
 from pathlib import Path
-from office365.runtime.auth.authentication_context import AuthenticationContext
-from office365.sharepoint.client_context import ClientContext
 from itsdangerous import URLSafeSerializer
 from operator import itemgetter as iget
+from apscheduler.schedulers.background import BackgroundScheduler
 import datetime as datetime
-import pytz, openpyxl, os, sys, json, traceback
+import pytz, openpyxl, os, sys, json, traceback, imaplib, email, atexit
 
 # itt tároljuk el a belépési adatokat a SharePointhoz. Mivel a fejlesztés Windowson, az éles/teszt környezet pedig Linuxon (Ubuntu 22) volt/van,
 # ezért linuxon a configok között eltárolt json fájlt, developmenthez pedig a lokális jsont használjuk (így a publikus internetre nem kerül ki a jelszó,
@@ -275,34 +274,50 @@ def refreshExcel():
         f.close()
         print("We should refresh the table now!")
 
-    url = config.get("SP_URL")
-    username = config.get('GTKUSER')
-    password = config.get('GTKPASS')
+    serv = config.get("IMAP_SERVER")
+    username = config.get('IMAP_USER')
+    password = config.get('IMAP_PASS')
+    mailbox_name = config.get('IMAP_MAILBOX')
+    print(f" > Imap logged in, starting refresh")
 
-    ctx_auth = AuthenticationContext(url)
-    ctx_auth.acquire_token_for_user(username, password)   
-    ctx = ClientContext(url, ctx_auth)
+    imap = imaplib.IMAP4_SSL(serv)
+    imap.login(username, password)
+    imap.select(mailbox_name)
 
-    if(config.get("MAIN_WBURL") != ""):
-        filename = "dl.xlsx"
+    status, email_ids = imap.search(None, "ALL")
+    if email_ids[0]:
+        email_id = email_ids[0].split()[-1]
 
-        file_path = os.path.abspath(filename)
-        with open(file_path, "wb") as local_file:
-            file = ctx.web.get_file_by_server_relative_url(config.get("MAIN_WBURL"))
-            file.download(local_file)
-            ctx.execute_query()
-        print(f" Excel refreshed: {file_path}")
+        # Fetch the email content
+        status, email_data = imap.fetch(email_id, "(RFC822)")
+        raw_email = email_data[0][1]
 
-    if(config.get("SEC_WBURL") != ''):
-        filename = "dlvizs.xlsx"
+        # Parse the email
+        msg = email.message_from_bytes(raw_email)
 
-        file_path = os.path.abspath(filename)
-        with open(file_path, "wb") as local_file:
-            file = ctx.web.get_file_by_server_relative_url(config.get("SEC_WBURL"))
-            file.download(local_file)
-            ctx.execute_query()
-        print(f" Excel refreshed: {file_path}")
-    
+        # Check if the email has attachments
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_maintype() == "application" and part.get("Content-Disposition"):
+                    # Extract the attachment filename
+                    attachment_filename = part.get_filename()
+                    if attachment_filename == config.get("MAIN_WB"):
+                        # Download the attachment
+                        with open(attachment_filename, "wb") as file:
+                            file.write(part.get_payload(decode=True))
+                        print(f"Downloaded attachment: {attachment_filename}")
+                        print(f" > Main excel refreshed")
+                    elif attachment_filename == config.get("SEC_WB"):
+                        # Download the attachment
+                        with open(attachment_filename, "wb") as file:
+                            file.write(part.get_payload(decode=True))
+                        print(f"Downloaded attachment: {attachment_filename}")
+                        print(f" > Secondary excel refreshed")
+    else:
+        print("Can't refresh with IMAP - there is no refresh needed")
+
+    imap.logout()
+    print(f" > Imap logged out")
     db.recalculate()
     return True
 
@@ -399,9 +414,9 @@ def calcHasznosDatumok():
         WB = openpyxl.load_workbook("dl.xlsx", True)
     if(config.get("SEC_WBURL") != ""):
         WBvizs = openpyxl.load_workbook("dlvizs.xlsx", True)
+    
     hasznosDatumok = []
-    dates = []
-    naps = []
+    checkDate = []
 
     try:
         if(config.get("MAIN_WBSHEET") != ""):
@@ -415,52 +430,49 @@ def calcHasznosDatumok():
         for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
             if(row[0].value == None or row[0].value == "" or row[0].value == " "):
                 continue
-            if row[0].value not in dates:
-                dates.append(row[0].value)
+            if str(row[0].value)[:10] not in checkDate:
+                checkDate.append(str(row[0].value)[:10])
                 if(row[1].value == "Monday"):
-                    naps.append("hétfő")
+                    hasznosDatumok.append((str(row[0].value)[:10], "hétfő"))
                 elif(row[1].value == "Tuesday"):
-                    naps.append("kedd")
+                    hasznosDatumok.append((str(row[0].value)[:10], "kedd"))
                 elif(row[1].value == "Wednesday"):
-                    naps.append("szerda")
+                    hasznosDatumok.append((str(row[0].value)[:10], "szerda"))
                 elif(row[1].value == "Thursday"):
-                    naps.append("csütörtök")
+                    hasznosDatumok.append((str(row[0].value)[:10], "csütörtök"))
                 elif(row[1].value == "Friday"):
-                    naps.append("péntek")
+                    hasznosDatumok.append((str(row[0].value)[:10], "péntek"))
                 elif(row[1].value == "Saturday"):
-                    naps.append("szombat")
+                    hasznosDatumok.append((str(row[0].value)[:10], "szombat"))
                 elif(row[1].value == "Sunday"):
-                    naps.append("vasárnap")
+                    hasznosDatumok.append((str(row[0].value)[:10], "vasárnap"))
                 else:
-                    naps.append(row[1].value)
+                    hasznosDatumok.append((str(row[0].value)[:10], row[1].value))
     
     if(config.get("SEC_WBSHEET") != ""):
         for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
             if(row[0].value == None or row[0].value == "" or row[0].value == " "):
                 continue
-            if row[0].value not in dates:
-                dates.append(row[0].value)
+            if str(row[0].value)[:10] not in checkDate:
+                checkDate.append(str(row[0].value)[:10])
                 if(row[1].value == "Monday"):
-                    naps.append("hétfő")
+                    hasznosDatumok.append((str(row[0].value)[:10], "hétfő"))
                 elif(row[1].value == "Tuesday"):
-                    naps.append("kedd")
+                    hasznosDatumok.append((str(row[0].value)[:10], "kedd"))
                 elif(row[1].value == "Wednesday"):
-                    naps.append("szerda")
+                    hasznosDatumok.append((str(row[0].value)[:10], "szerda"))
                 elif(row[1].value == "Thursday"):
-                    naps.append("csütörtök")
+                    hasznosDatumok.append((str(row[0].value)[:10], "csütörtök"))
                 elif(row[1].value == "Friday"):
-                    naps.append("péntek")
+                    hasznosDatumok.append((str(row[0].value)[:10], "péntek"))
                 elif(row[1].value == "Saturday"):
-                    naps.append("szombat")
+                    hasznosDatumok.append((str(row[0].value)[:10], "szombat"))
                 elif(row[1].value == "Sunday"):
-                    naps.append("vasárnap")
+                    hasznosDatumok.append((str(row[0].value)[:10], "vasárnap"))
                 else:
-                    naps.append(row[1].value)
-
-    for x in range(0,len(dates)):
-        hasznosDatumok.append(str(dates[x])[:10])
-    
-    return (hasznosDatumok,naps)
+                    hasznosDatumok.append((str(row[0].value)[:10], row[1].value))
+    hasznosDatumok.sort(key=lambda x: x[0])
+    return hasznosDatumok
 
 # elmenti a kurzuskódokat (apinak) / 5-ös oszlop valszleg a kurzuskód
 def getCourseCodes(db, hasznosDatumok, courseCode):
@@ -469,6 +481,131 @@ def getCourseCodes(db, hasznosDatumok, courseCode):
     for sor in filtered.data:
         backdb.append(sor[5])
     return sorted(list(set(backdb)))
+
+def saveCourseCodes(user):
+    couCodesOut = []
+    dct = {"desc":"Tábla Export Kurzuskód Követő JSON", "expversion":"1", "for_user":user,"course_codes":couCodesOut}
+    jsonobj = json.dumps(dct, indent=4, ensure_ascii=False).encode('utf-8')
+    with open("./tarolo/"+request.form['usnamepost']+"_coursecodes.json", "wb") as outfile:
+        outfile.write(jsonobj)
+
+def iterateCCF():
+    print('Automatikus kurzuskód-ellenőrzés')
+    for filename in os.listdir(os.getcwd()+'/tarolo/'):
+        f = os.path.join(os.getcwd()+'/tarolo/', filename)
+        # checking if it is a file
+        if os.path.isfile(f) and '_ccf.json' in f:
+            f = open(f, encoding='utf-8')
+            oldjs = json.load(f)
+            saveCodes(oldjs['for_user'], oldjs['followed_codes_encoded'])
+
+def saveCodes(selusname, selcodes):
+    cal = Calendar()
+    feldolg = []
+    dct = {
+        "desc":"Tábla Export JSON fájl",
+        "expversion":config.get('EXPVERSION'),
+        "for_user":selusname,
+        "entries":[]
+    }
+    dct_follow = {
+        "desc":"Tábla Export JSON fájl - kurzuskód követőhöz",
+        "expversion":config.get('EXPVERSION'),
+        "for_user":selusname,
+        "followed_codes_encoded":"",
+        "followed_codes":[]
+    }
+    cal.add('prodid', '-//Kurzuskód-követő - Órarend//Exportalva ide: '+selusname+'//')
+    cal.add('version', '2.0')
+    cal.add('x-wr-timezone', 'Europe/Budapest')
+    courseCodes = selcodes.split(";")
+    #print(esemenyek)
+    if(len(courseCodes) == 0):
+        print("Üres esemenyek lista :()")
+    for i in courseCodes:
+        if(i == "" or i == " "):
+            continue
+        else:
+            for sor in calcFilter(db.data, interHasznDatumok, 'null','null','null',i).data:
+                #print("van sorunk")
+                #print(sor)
+                try:
+                    event = Event()
+                    if "Típus:" in sor[6]:
+                        event.add('summary', "🎓 "+sor[3]+" > ["+sor[7]+"]")
+                        event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>"+sor[7]+"<br/>Kalappal :3<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
+                    else:
+                        event.add('summary', sor[3]+" > ["+sor[7]+"]")
+                        event.add('description', "Kód: "+sor[5]+" > "+sor[4]+"<br/>Csoport: "+sor[6]+"<br/>Oktató(k): "+sor[11]+"<br/><br/>(Sorszám táblázatban: "+str(sor[-1])+")")
+
+                    if sor[2] == 'ismeretlen':
+                        continue
+                    elif("." in sor[2]):
+                        dt = {
+                            "date":sor[0],
+                            "from":sor[2].split(".")[0],
+                            "to":sor[2].split(".")[1],
+                            "location":sor[7],
+                            "course_name":sor[3],
+                            "course_code":sor[5],
+                            "subj_code":sor[4],
+                            "groups":sor[6],
+                            "id":sor[-1]
+                        }
+                        event.add('dtstart', datetime.datetime.strptime(sor[0]+" "+sor[2].split(".")[0], '%Y-%m-%d %H:%M'))
+                        event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split(".")[1], '%Y-%m-%d %H:%M')) 
+                    else:
+                        dt = {
+                            "date":sor[0],
+                            "from":sor[2].split("-")[0],
+                            "to":sor[2].split("-")[1],
+                            "location":sor[7],
+                            "course_name":sor[3],
+                            "course_code":sor[5],
+                            "subj_code":sor[4],
+                            "groups":sor[6],
+                            "id":sor[-1]
+                        }
+                        event.add('dtstart', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[0], '%Y-%m-%d %H:%M'))
+                        event.add('dtend', datetime.datetime.strptime(sor[0]+" "+sor[2].split("-")[1], '%Y-%m-%d %H:%M')) 
+                    
+                    event.add('priority', 5)
+                    event['uid'] = '2023osz/ID'+str(sor[-1])
+                    event['location'] = vText(sor[7])
+                    
+                    cal.add_component(event)
+
+                    dct["entries"].append(dt)
+                except Exception as e:
+                    feldolg.append(["Hiba történt az elem feldolgozása közben: "+str(e), i])
+                    print("  > naptárhiba: "+str(e))
+        dct_follow["followed_codes"].append(i)
+    dct_follow["followed_codes_encoded"] = selcodes
+    directory = Path.cwd() / 'cals'
+    try:
+        directory.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        print("   Folder already exists")
+    else:
+        print("   Folder was created")
+    
+    f = open(os.path.join(directory, selusname+'.ics'), 'wb')
+    f.write(cal.to_ical())
+    f.close()
+
+    jsonobj = json.dumps(dct, indent=4, ensure_ascii=False).encode('utf-8')
+    jsonobjfol = json.dumps(dct_follow, indent=4, ensure_ascii=False).encode('utf-8')
+
+    with open("./tarolo/"+selusname+"_lastexp.json", "wb") as outfile:
+        outfile.write(jsonobj)
+
+    with open("./tarolo/"+selusname+"_ccf.json", "wb") as outfile:
+        outfile.write(jsonobjfol)
+
+    print("Export done, everything went right!")
+    return feldolg
+
+## renderelés
 
 app = Flask(__name__)
 app.secret_key = config.get("SECRET_KEY")
@@ -482,12 +619,20 @@ refreshExcel()
 db.recalculate()
 
 interHasznDatumok=calcHasznosDatumok()
-interHasznNapok=interHasznDatumok[1]
-interHasznDatumok=interHasznDatumok[0]
+interHasznNapok=list(map(lambda x: x[1], interHasznDatumok))
+interHasznDatumok=list(map(lambda x: x[0], interHasznDatumok))
 
 interHasznHetek=calcHasznosHetek()
 interHasznHetKezdo=interHasznHetek[1]
 interHasznHetek=interHasznHetek[0]
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=refreshExcel, trigger="interval", hours=1)
+scheduler.add_job(func=iterateCCF, trigger="interval", hours=1)
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
+
+iterateCCF()
 
 @app.before_request
 def make_session_permanent():
@@ -512,6 +657,13 @@ def diff(name="Órarendváltozás-ellenőrzés"):
         return render_template('diff.html', resp=False, usname="", diffdb=[])
     d = calcDiff(db, a)
     return render_template('diff.html', resp=True, usname=a, diffdb=d)
+
+@app.route('/saveccf', methods = ['GET', 'POST'])
+def saveCourseCodes(name="Naptár exportálása", usname="", feldolg = []):
+    if(request.method == "POST"):
+        feldolg = saveCodes(request.form['selUsnamePost'], request.form['selectedCourseCodes'])
+        return render_template('saveccf.html', name=name, usname=request.form['selUsnamePost'], feldolg=feldolg, feldolghossz=len(feldolg))
+
 
 @app.route('/savecal', methods = ['GET', 'POST'])
 def saveCal(name="Naptár exportálása", usname="", feldolg=[]):
@@ -643,6 +795,13 @@ def index(name="Index", usname=""):
     if(session['username'] in config.get("ALLOWED")):
         print(f'viewer: '+session['view'])
 
+        ## check if courseCodeFollow is turned ON (file exists)
+        followedCodes = ''
+        if os.path.exists(os.getcwd()+'/tarolo/'+session['username']+'_ccf.json'):
+            f = open(os.getcwd()+'/tarolo/'+session['username']+'_ccf.json', encoding='utf-8')
+            oldjs = json.load(f)
+            followedCodes = oldjs['followed_codes_encoded']
+
         try:
             search_date = request.form['sz1']
         except Exception as e:
@@ -698,6 +857,7 @@ def index(name="Index", usname=""):
                             lasthit=lastHit(),
                             startpg=True,
                             elerhetoKartyaIdk = selectdb.felsorolo(),
+                            selfollowed=followedCodes,
                             view=session['view'],
                             apiKey=config.get('API_KEY')
                         ))
@@ -724,6 +884,7 @@ def index(name="Index", usname=""):
                             lasthit=lastHit(),
                             startpg=False,
                             elerhetoKartyaIdk = filterdb[0].felsorolo()+filterdb[1].felsorolo()+filterdb[2].felsorolo()+filterdb[3].felsorolo()+filterdb[4].felsorolo()+filterdb[5].felsorolo(),
+                            selfollowed=followedCodes,
                             view=session['view'],
                             apiKey=config.get('API_KEY')
                         ))
@@ -754,6 +915,7 @@ def index(name="Index", usname=""):
                     lasthit=lastHit(),
                     startpg=False,
                     elerhetoKartyaIdk = filterdb.felsorolo(),
+                    selfollowed=followedCodes,
                     view=session['view'],
                     apiKey=config.get('API_KEY')
                 ))
@@ -783,6 +945,7 @@ def index(name="Index", usname=""):
                     lasthit=lastHit(),
                     startpg=False,
                     elerhetoKartyaIdk = filterdb[0].felsorolo()+";"+filterdb[1].felsorolo()+";"+filterdb[2].felsorolo()+";"+filterdb[3].felsorolo()+";"+filterdb[4].felsorolo()+";"+filterdb[5].felsorolo(),
+                    selfollowed=followedCodes,
                     view=session['view'],
                     apiKey=config.get('API_KEY')
                 ))
@@ -811,6 +974,7 @@ def index(name="Index", usname=""):
             lasthit=lastHit(),
             startpg=True,
             elerhetoKartyaIdk = 0,
+            selfollowed=followedCodes,
             view=session['view'],
             apiKey=config.get('API_KEY')
         ))
@@ -867,6 +1031,22 @@ def api_resource():
         print(traceback.format_exc())
         response_data = {'error_code': 'Request syntax error'}
         return jsonify(response_data), 401
+    
+@app.route('/api/savecou', methods=['POST'])
+def api_savecou():
+    data = request.json
+    print(data)
+    try:
+        if(data['key'] != config.get('API_KEY')):
+            response_data = {'error_code': 'Not authorized'}
+            return jsonify(response_data), 401
+        elif(data['coursecodes'] != '' or data['coursecodes'] != ' '):
+            response_data = {'response':True,'data':'ok'}
+            return jsonify(response_data), 201
+    except Exception as e:
+        print(traceback.format_exc())
+        response_data = {'error_code': 'Request syntax error'}
+        return jsonify(response_data), 401
 
 ## fájlok
 @app.route('/cals/<path:path>')
@@ -916,7 +1096,6 @@ def err404(e):
         return render_template('404.html')
     except Exception as excp:
         return str(excp)
-    
 
 # ez indítja az actual servinget
 if __name__ == "__main__":

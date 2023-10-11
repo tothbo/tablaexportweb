@@ -31,14 +31,11 @@ async function redoSelections(){
         var midlist = localStorage.getItem("cardPickStor").split(";");
         if(midlist[0] != ""){
             for(let i = 0; i < midlist.length-1; i++){
-                console.log(midlist[i]);
                 await sleep(2);
                 pickThis(midlist[i], true);
             }
         }
     }catch (e){
-        console.log("Catched Exception: "+e);
-        console.log("Card storage was: "+localStorage.getItem("cardPickStor"));
         await sleep(5);
     }
     await sleep(2);
@@ -64,15 +61,12 @@ function clearSelections(){
 }
 
 function pickThis(cardID, load){
-    console.log("start")
     if(!load){
         if(document.getElementById('picker'+cardID).classList.contains("btn-dark")){
-            console.log("Val warn:")
-            var midlist = document.getElementById('valasztottak1').value.split(";");
+            let midlist = document.getElementById('valasztottak1').value.split(";");
             document.getElementById('valasztottak1').value = "";
             for(let i = 0; i < midlist.length-1; i++){
                 if(midlist[i] != cardID){
-                    console.log(midlist[i]);
                     document.getElementById('valasztottak1').value += midlist[i]+';';
                 }
             }
@@ -82,9 +76,7 @@ function pickThis(cardID, load){
                 document.getElementById('picker'+cardID).classList.add("btn-outline-primary");
                 document.getElementById('picker'+cardID).classList.remove("btn-dark");
                 document.getElementById('card'+cardID).classList.remove('text-bg-warning');
-            }catch(e){
-                console.log("can't find: "+cardID);
-            }
+            }catch(e){}
             localStorage.setItem("cardPickStor", document.getElementById('valasztottak1').value);
         }else{
             load = true
@@ -92,16 +84,12 @@ function pickThis(cardID, load){
     }
     
     if(load){
-        console.log("Val norm:")
         document.getElementById('valasztottak1').value = document.getElementById('valasztottak1').value+cardID+';';
-        console.log(document.getElementById('valasztottak1').value);
         try{
             document.getElementById('picker'+cardID).classList.add("btn-dark");
             document.getElementById('picker'+cardID).classList.remove("btn-outline-primary");
             document.getElementById('card'+cardID).classList.add('text-bg-warning');
-        }catch(e){
-            console.log("can't find: "+cardID);
-        }
+        }catch(e){}
         document.getElementById('valasztottak2').value = document.getElementById('valasztottak1').value;
         localStorage.setItem("cardPickStor", document.getElementById('valasztottak1').value);
         document.getElementById('valasztottakDarab').innerText = 'Kiválasztva: '+(document.getElementById('valasztottak1').value.split(';').length - 1)+' darab kártya';

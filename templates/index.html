@@ -104,7 +104,7 @@
                                 </button>
                             </div>
                             <div class="col-6">
-                                <button type="button" class="btn btn-outline-primary mt-3" data-bs-toggle="modal" data-bs-target="#codefollowModal">
+                                <button type="button" class="btn btn-outline-primary mt-3" data-bs-toggle="modal" data-bs-target="#codefollowWarning">
                                     Kurzuskód-követő
                                 </button>
                             </div>
@@ -228,7 +228,7 @@
                                 </button>
                             </div>
                             <div class="col-12 mt-3">
-                                <button type="button" class="btn btn-outline-primary mt-3" data-bs-toggle="modal" data-bs-target="#codefollowModal">
+                                <button type="button" class="btn btn-outline-primary mt-3" data-bs-toggle="modal" data-bs-target="#codefollowWarning">
                                     Kurzuskód-követő
                                 </button>
                             </div>
@@ -300,7 +300,31 @@
                     </div>
                 </div>
             </div>
-            <div class="modal fade" id="codefollowModal" tabindex="-1" aria-labelledby="codefollowModalLabel" aria-hidden="true">
+            <div class="modal fade" id="codefollowWarning" aria-hidden="true" aria-labelledby="codefollowWarningLabel" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h1 class="modal-title fs-5" id="codefollowWarningLabel">Kurzuskód-követő</h1>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      <strong>Gyors információk, mielőtt beállítanád a kurzuskód-követőt:</strong>
+                        <ul>
+                            <li>A kurzuskód-követő felülírja a naptárat - tehát ha szeretnél visszatérni a manuális exportálásra, kérlek keress meg minket, hogy ki tudjuk kapcsolni a kurzuskód-követőt. Ezt a <strong>grafikus felületről sajnos nem fogod tudni magadtól kikapcsolni</strong>!</li>
+                            <li>A megadott kurzuskód mögött lévő összes órát - mely már rendelkezik dátummal - exportálja a rendszer, tehát ha van két vizsga, mindkettő ugyanazzal a kurzuskóddal, nem tudod kiválasztani melyiket exportáljuk</li>
+                            <li>Jelenleg csak a kurzuskódot nézi a rendszer - technikailag ez elég ahhoz, hogy az órákat pontosan kiválogassa, de ha egy kurzuskód mögött több tárgykód is lenne, minden különböző tárgykódot is exportál a rendszer</li>
+                            <li>A változások ellenőrzése órás ciklusokban történik - azonban a legtöbb naptáralkalmazás lassabban frissül, tehát a változás a táblázatban és a naptár között akár 24 óra is lehet</li>
+                            <li>Dolgozunk azon, hogy e-mailben is értesítést küldjünk a változásokról - sajnos ez most még nem elérhető</li>
+                            <li>Ha bármilyen csúszást érzékelsz, mindenképpen jelezd számunkra!</li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                      <button class="btn btn-primary" data-bs-target="#codefollowModal" data-bs-toggle="modal">Értettem, tovább a beállításokhoz</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <div class="modal fade" id="codefollowModal" tabindex="-1" aria-labelledby="codefollowModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" >
                 <div class="modal-dialog modal-lg">
                   <div class="modal-content">
                     <div class="modal-header">
@@ -312,18 +336,23 @@
                             <div class="row">
                                 <div class="col-12"><input id="codeSearchField" type="text" class="form-control" placeholder="Kereséshez kezdd el begépelni a kurzuskódot (legalább 3 karaktert :D)..." /><input type="hidden" id="apiKeyHolder" value="{{ apiKey }}" /></div>
                             </div>
-                            <div class="mt-3" id="codeSelector">
-                                
+                            <div class="d-flex flex-row flex-wrap mb-3 mt-3 justify-content-center" id="codeSelector"> 
                             </div>
                         </div>
+                    </div>
+                    <form method="POST" action="/saveccf" class="modal-footer">
+                        <input type="hidden" class="d-none" id="selectedCourseCodes" name="selectedCourseCodes" value="{{ selfollowed }}" />
+                        <input type="hidden" name="selUsnamePost" value="{{ usname }}" />
+                        <p id="courseCodeLength">Töltök...</p>
+                        <button type="submit" class="btn btn-primary">Mentés</button>
                     </div>
                   </div>
                 </div>
             </div>
+        <script src="/static/jquery.min.js" ></script>
         <script type="text/javascript" src="/static/cardPicker.js"></script>
         <script type="text/javascript" src="/static/saveCourseCodes.js"></script>
         {% endif %}
         <script src="/static/bootstrap.bundle.min.js"></script>
-        <script src="/static/jquery.min.js" ></script>
     </body>
 </html> 

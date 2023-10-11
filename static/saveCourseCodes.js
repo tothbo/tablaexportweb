@@ -7,12 +7,16 @@ inputField.addEventListener('input', function () {
     clearTimeout(typingTimer);
     typingTimer = setTimeout(function () {
         // User has finished typing, perform request
-        console.log('User finished typing');
         if(($('#codeSearchField').val() !== '' || $('#codeSearchField').val() !== ' ') && $('#codeSearchField').val().length >= 3){
             calcCodePicker($('#codeSearchField').val());
+        }else{
+            showSelected();
         }
     }, doneTypingInterval);
 });
+
+localStorage.setItem('courseCodesStor', $('#selectedCourseCodes').val());
+$('#courseCodeLength').html('Kiválasztva: '+($('#selectedCourseCodes').val().split(';').length-1).toString()+' db - pld: '+localStorage.getItem('courseCodesStor').split(';')[0].toString());
 
 async function calcCodePicker(text){
     try{
@@ -23,24 +27,23 @@ async function calcCodePicker(text){
     }
     document.getElementById('codeSelector').innerHTML = '';
     for(let i = 0; i < arr.data.length; i++){
-        document.getElementById('codeSelector').innerHTML += '<div class="row"><div class="col-8"><p>'+arr.data[i]+'</p></div><div class="col-4"><button class="btn btn-primary" onclick="followCourseCode(\''+arr.data[i]+'\')">Kiválaszt</button></div></div>';
+        if(localStorage.getItem('courseCodesStor') && localStorage.getItem('courseCodesStor').includes(arr.data[i])){
+            document.getElementById('codeSelector').innerHTML += '<button class="btn btn-warning ms-1 me-1 mt-1" id="corCd'+arr.data[i]+'" onclick="followCourseCode(\''+arr.data[i]+'\')">'+arr.data[i]+'</button>';
+        }else{
+            document.getElementById('codeSelector').innerHTML += '<button class="btn btn-primary ms-1 me-1 mt-1" id="corCd'+arr.data[i]+'" onclick="followCourseCode(\''+arr.data[i]+'\')">'+arr.data[i]+'</button>';
+        }  
     }
 }
 
 async function getCourseCodes(apiKey, courseCode) {
-    // Create a JSON object with the API key and course code
     let body = {
         key: apiKey,
         course_code: courseCode
     };
 
-    // Get the current domain (origin) of the web page
     let currentDomain = window.location.origin;
-
-    // Construct the API endpoint URL
     let apiUrl = currentDomain + "/api/resource";
 
-    // Set up AJAX settings to send a JSON request
     return $.ajax({
         url: apiUrl,
         type: "POST",
@@ -49,6 +52,36 @@ async function getCourseCodes(apiKey, courseCode) {
     });
 }
 
+function showSelected(){
+    $('#codeSelector').html('');
+    for(let i = 0; i < arr.data.length; i++){
+        if(localStorage.getItem('courseCodesStor') && localStorage.getItem('courseCodesStor').includes(arr.data[i])){
+            document.getElementById('codeSelector').innerHTML += '<button class="btn btn-warning ms-1 me-1 mt-1" id="corCd'+arr.data[i]+'" onclick="followCourseCode(\''+arr.data[i]+'\')">'+arr.data[i]+'</button>';
+        }else{
+            document.getElementById('codeSelector').innerHTML += '<button class="btn btn-primary ms-1 me-1 mt-1" id="corCd'+arr.data[i]+'" onclick="followCourseCode(\''+arr.data[i]+'\')">'+arr.data[i]+'</button>';
+        }  
+    }
+}
+
 function followCourseCode(courseID){
-    console.log(courseID);
+    if(document.getElementById('corCd'+courseID).classList.contains('btn-primary')){
+        document.getElementById('corCd'+courseID).classList.add('btn-warning');
+        document.getElementById('corCd'+courseID).classList.remove('btn-primary');
+
+        document.getElementById('selectedCourseCodes').value = document.getElementById('selectedCourseCodes').value+courseID+';';
+        localStorage.setItem('courseCodesStor', document.getElementById('selectedCourseCodes').value);
+    }else{
+        document.getElementById('corCd'+courseID).classList.add('btn-primary');
+        document.getElementById('corCd'+courseID).classList.remove('btn-warning');
+
+        let midlist = document.getElementById('selectedCourseCodes').value.split(";");
+        document.getElementById('selectedCourseCodes').value = "";
+        for(let i = 0; i < midlist.length-1; i++){
+            if(midlist[i] != courseID){
+                document.getElementById('selectedCourseCodes').value += midlist[i]+';';
+            }
+        }
+        localStorage.setItem('courseCodesStor', $('#selectedCourseCodes').val());
+    }
+    $('#courseCodeLength').html('Kiválasztva: '+($('#selectedCourseCodes').val().split(';').length-1).toString()+' db - pld: '+localStorage.getItem('courseCodesStor').split(';')[0].toString());
 }
