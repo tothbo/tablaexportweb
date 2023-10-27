@@ -390,19 +390,25 @@ def calcHasznosHetek():
     
     if(config.get("MAIN_WBSHEET") != ""):
         for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
-            if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+            try:
+                if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+                    continue
+                if row[0].value.isocalendar()[1] not in weekNums:
+                    weekNums.append(row[0].value.isocalendar()[1])
+                    startDate.append(row[0].value)
+            except:
                 continue
-            if row[0].value.isocalendar()[1] not in weekNums:
-                weekNums.append(row[0].value.isocalendar()[1])
-                startDate.append(row[0].value)
 
     if(config.get("SEC_WBSHEET") != ""):
         for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
-            if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+            try:
+                if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+                    continue
+                if row[0].value.isocalendar()[1] not in weekNums:
+                    weekNums.append(row[0].value.isocalendar()[1])
+                    startDate.append(row[0].value)
+            except:
                 continue
-            if row[0].value.isocalendar()[1] not in weekNums:
-                weekNums.append(row[0].value.isocalendar()[1])
-                startDate.append(row[0].value)
 
     for x in range(0,len(weekNums)):
         hasznosHetek.append(str(weekNums[x]))
@@ -428,9 +434,11 @@ def calcHasznosDatumok():
     
     if(config.get("MAIN_WBSHEET") != ""):
         for row in SH.iter_rows(min_row=3, min_col=1, max_row=2500, max_col=12):
-            if(row[0].value == None or row[0].value == "" or row[0].value == " "):
+            if isinstance(row[0].value, type(datetime.date(2020,11,11))) == False:
                 continue
-            if str(row[0].value)[:10] not in checkDate:
+            elif row[0].value == None or row[0].value == "" or row[0].value == " ":
+                continue
+            elif str(row[0].value)[:10] not in checkDate:
                 checkDate.append(str(row[0].value)[:10])
                 if(row[1].value == "Monday"):
                     hasznosDatumok.append((str(row[0].value)[:10], "hétfő"))
@@ -527,6 +535,8 @@ def saveCodes(selusname, selcodes):
             continue
         else:
             for sor in calcFilter(db.data, interHasznDatumok, 'null','null','null',i).data:
+                if sor[5] != i:
+                    continue
                 #print("van sorunk")
                 #print(sor)
                 try:
