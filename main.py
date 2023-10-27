@@ -104,9 +104,9 @@ class KartyAdatok():
                 self.data.append(interlist)
                 i += 1
             
-            print("  > MAIN last row hit at "+str(lst)+", with id "+str(lst[-1]))
+            print(" > MAIN last row hit at "+str(lst)+", with id "+str(lst[-1]))
         else:
-            print("  > MAIN table not found.") 
+            print(" > MAIN table not found.") 
 
         if(config.get("SEC_WBSHEET") != ''):
             for row in SHvizs.iter_rows(min_row=2, min_col=1, max_row=2500, max_col=12):
@@ -135,11 +135,11 @@ class KartyAdatok():
                 self.data.append(rebindls)
                 i += 1
 
-            print("  > SECONDARY last row hit at "+str(lst)+", with id "+str(lst[-1]))
+            print(" > SECONDARY last row hit at "+str(lst)+", with id "+str(lst[-1]))
         else:
-            print("  > SECONDARY table not found.")        
+            print(" > SECONDARY table not found.")        
         self.data = sorted(self.data, key=lambda x: (x[0], x[2]))
-        print("Recalculated all the workbooks, now we have "+str(len(self.data))+" rows.")
+        print("Recalculated all the workbooks, now we have "+str(len(self.data))+" rows.\n")
 
 def calcTextHet(hasznosHetekKezdo):
     textHasznHetek = []
@@ -317,7 +317,7 @@ def refreshExcel():
         print("Can't refresh with IMAP - there is no refresh needed")
 
     imap.logout()
-    print(f" > Imap logged out")
+    print(f" > Imap logged out\n")
     db.recalculate()
     return True
 
