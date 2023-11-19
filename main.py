@@ -199,13 +199,13 @@ def calcFilterWeeks(databs, hasznosHetek, filterWeekId='null', filterTargykod='n
         if(datetime.datetime.strptime(row[0], "%Y-%m-%d").isocalendar()[1] != hasznosHetek[int(filterWeekId)].isocalendar()[1]):
             should = False
         if(filterTargykod != 'null' and should == True):
-            if(filterTargykod.lower() not in row[4].lower()):
+            if(filterTargykod.lower() not in str(row[4]).lower()):
                 should = False
         if(filterTargynev != 'null' and should == True):
-            if(filterTargynev.lower() not in row[3].lower()):
+            if(filterTargynev.lower() not in str(row[3]).lower()):
                 should = False
         if(filterKurz != 'null' and should == True):
-            if(filterKurz.lower() not in row[5].lower()):
+            if(filterKurz.lower() not in str(row[5]).lower()):
                 should = False
         if(should and datetime.datetime.strptime(row[0], "%Y-%m-%d").weekday() != 6):
             outdb[datetime.datetime.strptime(row[0], "%Y-%m-%d").weekday()].addRow(row)
@@ -219,13 +219,13 @@ def calcFilter(databs, hasznosDatumok, filterDateId='null', filterTargykod='null
             if(row[0] != hasznosDatumok[int(filterDateId)]):
                 should = False
         if(filterTargykod != 'null' and should == True):
-            if(filterTargykod.lower() not in row[4].lower()):
+            if(filterTargykod.lower() not in str(row[4]).lower()):
                 should = False
         if(filterTargynev != 'null' and should == True):
-            if(filterTargynev.lower() not in row[3].lower()):
+            if(filterTargynev.lower() not in str(row[3]).lower()):
                 should = False
         if(filterKurz != 'null' and should == True):
-            if(filterKurz.lower() not in row[5].lower()):
+            if(filterKurz.lower() not in str(row[5]).lower()):
                 should = False
         if(should):
             outdb.addRow(row)
