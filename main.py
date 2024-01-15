@@ -10,7 +10,7 @@ import pytz, openpyxl, os, sys, json, traceback, imaplib, email, atexit
 # itt tároljuk el a belépési adatokat a SharePointhoz. Mivel a fejlesztés Windowson, az éles/teszt környezet pedig Linuxon (Ubuntu 22) volt/van,
 # ezért linuxon a configok között eltárolt json fájlt, developmenthez pedig a lokális jsont használjuk (így a publikus internetre nem kerül ki a jelszó,
 # a szerveren pedig korlátozva van a hozzáférés ezekhez az adatokhoz). Optimális megoldás az lenne, ha OAuth2-vel bejelentkeztetnénk, majd token használatával
-# lenne lekérve az új excel, de ez nem került implementálásra. B opció az API használat (api kulcsal), de ez le van tiltva az ELTE SharePointon :(
+# lenne lekérve az új excel, de ez nem került implementálásra. B opció az API használat (api kulcsal), de ez le van tiltva jelenleg.
 
 config = ''
 
